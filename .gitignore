@@ -6,3 +6,5 @@ android/local.properties
 *.keystore
 .signing/
 *.jks
+dist/
+cache-videos.json
