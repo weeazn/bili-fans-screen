@@ -1,0 +1,2341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>B站粉丝数 · 实时看板</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#05070d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23fb7299'/><text x='16' y='23' font-size='18' text-anchor='middle' fill='white' font-family='sans-serif'>B</text></svg>">
+<style>
+  /* =========================================================================
+     平面设计风格 (Flat Design)
+     · 纯色块 + 实线描边 + 硬投影，没有渐变 / 毛玻璃 / 发光 / 圆角滥用
+     · 涨粉动画：数字逐位翻滚 + 账号卡描边闪动 + 「+N」徽章弹入
+     ========================================================================= */
+  :root{
+    --bg:#0b0d12;
+    --surface:#12151d;
+    --surface-2:#171b25;
+    --text:#f2f4f8;
+    --dim:#8b93a7;
+    --line:#2a3040;
+    --pink:#fb7299;
+    --pink-ink:#14161c;
+    --blue:#00aeec;
+    --up:#22c98a;
+    --down:#ff5f6d;
+    --r:14px;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f6;
+    --surface:#ffffff;
+    --surface-2:#f4f6fa;
+    --text:#14161c;
+    --dim:#6b7488;
+    --line:#dbe0ea;
+    --pink:#fb7299;
+    --pink-ink:#ffffff;
+    --blue:#00aeec;
+    --up:#12a06a;
+    --down:#e5484d;
+  }
+  /* OLED 防烧屏：背景纯黑（不发光）+ 去掉卡片的填充色（只留描边）
+     —— 填充色会让整块区域持续发光，是烧屏的元凶。
+     注意：纯黑背景下细描边会显得很暗，所以描边/次要文字特意调得比深色主题更亮，
+     保证可读性（对比度不足比烧屏更影响使用） */
+  :root[data-theme="oled"]{
+    --bg:#000000;
+    --surface:#000000;
+    --surface-2:#0a0a0c;
+    --text:#f2f5fa;
+    --dim:#aeb6c4;
+    --line:#6f7a8c;
+    --pink:#fb7299;
+    --pink-ink:#ffffff;
+    --blue:#00aeec;
+    --up:#26e0a6;
+    --down:#ff7b84;
+  }
+  /* 纯黑背景：连浏览器过度滚动区域也别露白 */
+  :root[data-theme="oled"] html,
+  :root[data-theme="oled"] body{background:#000 !important}
+  :root[data-theme="oled"] .iconbtn,
+  :root[data-theme="oled"] .chip,
+  :root[data-theme="oled"] .account,
+  :root[data-theme="oled"] .chartbox,
+  :root[data-theme="oled"] .range button,
+  :root[data-theme="oled"] .linkbtn,
+  :root[data-theme="oled"] .delta .pill{background:transparent}
+  :root[data-theme="oled"] .growpop{border-color:#000}
+  /* 走势图顶部的说明文字：纯黑下用亮一点的灰 */
+  :root[data-theme="oled"] .chartbox .cap,
+  :root[data-theme="oled"] .chartbox .empty{color:#c3cad6}
+  /* 时间范围按钮：未选中的也要看得清 */
+  :root[data-theme="oled"] .range button{color:#c3cad6;border-color:#5c6675}
+  :root[data-theme="oled"] .range button.on{background:var(--pink);border-color:var(--pink);color:#fff}
+  /* 防烧屏位移的基础设置（实际偏移由 JS 定时随机施加） */
+  .stage{will-change:transform}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{height:100%;-webkit-text-size-adjust:100%}
+  body{
+    margin:0;height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"HarmonyOS Sans SC","MiSans","PingFang SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+    overflow:hidden;user-select:none;-webkit-user-select:none;
+    transition:background .2s linear;
+  }
+  body.busy .dot{animation:blink .7s steps(1,end) infinite}
+  @keyframes blink{50%{opacity:.25}}
+
+  /* ============ 布局 ============ */
+  .stage{
+    height:100vh;height:100dvh;
+    padding:calc(env(safe-area-inset-top) + 14px) calc(env(safe-area-inset-right) + 16px)
+            calc(env(safe-area-inset-bottom) + 14px) calc(env(safe-area-inset-left) + 16px);
+    display:grid;grid-template-rows:auto auto 1fr auto;gap:12px;
+  }
+  /* 手机竖屏：内边距再收紧一点，把宽度都留给数字 */
+  @media (max-width:520px) and (max-aspect-ratio:1/1){
+    .stage{padding-left:12px;padding-right:12px;gap:8px}
+  }
+
+  /* ---- 顶栏 ---- */
+  .topbar{display:flex;align-items:center;gap:10px;min-height:38px}
+  .brand{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;letter-spacing:.06em}
+  .brand .tv{
+    width:26px;height:26px;border-radius:7px;background:var(--pink);color:var(--pink-ink);
+    display:grid;place-items:center;font-size:14px;font-weight:800;
+  }
+  .brand small{color:var(--dim);font-weight:500;letter-spacing:.02em}
+  .spacer{flex:1}
+  .chip{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:7px 12px;border-radius:999px;
+    background:var(--surface);border:2px solid var(--line);
+    font-size:12px;font-weight:600;color:var(--dim);white-space:nowrap;
+  }
+  .chip b{color:var(--text)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--up);flex:0 0 auto}
+  .dot.warn{background:#f0a020}
+  .dot.err{background:var(--down)}
+  .iconbtn{
+    width:38px;height:38px;flex:0 0 auto;border-radius:10px;
+    background:var(--surface);border:2px solid var(--line);color:var(--dim);
+    display:grid;place-items:center;font-size:16px;line-height:1;cursor:pointer;
+    transition:transform .08s linear,background .15s linear,color .15s linear;
+  }
+  .iconbtn:active{transform:translateY(2px);background:var(--surface-2);color:var(--text)}
+
+  /* ---- 主区 ---- */
+  .main{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:clamp(14px,3.2vh,40px);min-height:0;padding:2vh 0;
+  }
+  .account{
+    display:flex;align-items:center;gap:14px;max-width:94vw;
+    padding:10px 22px 10px 10px;border-radius:999px;
+    background:var(--surface);border:2px solid var(--line);
+    transition:background .25s linear,border-color .25s linear;
+  }
+  .account.paged{animation:slideIn .3s ease-out}
+  @keyframes slideIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+  .account .avwrap{position:relative;flex:0 0 auto;width:52px;height:52px}
+  .account img{
+    width:52px;height:52px;border-radius:50%;object-fit:cover;display:block;
+    background:var(--surface-2);border:3px solid var(--pink);
+  }
+  .account .who{display:flex;flex-direction:column;gap:2px;line-height:1.3;min-width:0}
+  .account .name{
+    font-size:clamp(17px,2.6vmin,24px);font-weight:800;letter-spacing:.01em;
+    max-width:58vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .account .sign{
+    font-size:clamp(11px,1.5vmin,13px);color:var(--dim);font-weight:500;
+    max-width:56vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .account .uidtag{
+    font-size:11px;font-weight:700;color:var(--dim);
+    border:2px solid var(--line);border-radius:6px;padding:1px 7px;margin-left:8px;
+    vertical-align:middle;white-space:nowrap;
+  }
+
+  /* ---- 涨粉动画（核心） ---- */
+  .account.grow{animation:growFrame 1.5s ease-out}
+  @keyframes growFrame{
+    0%{background:var(--surface);border-color:var(--line)}
+    12%{background:var(--pink);border-color:var(--pink)}
+    60%{background:var(--pink);border-color:var(--pink)}
+    100%{background:var(--surface);border-color:var(--line)}
+  }
+  .account.grow .name,.account.grow .sign,.account.grow .uidtag{color:var(--pink-ink);border-color:rgba(255,255,255,.55)}
+  .account.grow img{animation:avPop .6s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes avPop{0%{transform:scale(1)}45%{transform:scale(1.16)}100%{transform:scale(1)}}
+
+  .count-wrap{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:6px;max-width:100%;min-width:0}
+  .count{
+    display:inline-block;font-size:100px;   /* 基准字号固定，实际大小由 fitCount() 缩放决定 */
+    font-weight:800;line-height:.94;letter-spacing:normal;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+    color:var(--text);
+    white-space:nowrap;
+    transform-origin:center center;
+    will-change:transform;
+  }
+  /* 缩放用 zoom（若浏览器支持）→ 布局尺寸同步缩放，父容器 flex 居中即天然居中；
+     不支持的浏览器自动退回 transform: scale()，由 JS 检测后选择 */
+  @supports (zoom:1){
+    .count{zoom:var(--fit,1);transform:none !important}
+  }
+  .count-inner{display:inline-block;white-space:nowrap}
+  .count.placeholder{
+    font-size:14px !important;color:var(--dim);font-weight:700;letter-spacing:.02em;
+    zoom:1 !important;transform:none !important;
+  }
+  /* 数字用固定 0.62em 宽 + 表格数字特性 → 逐位翻滚时宽度不抖 */
+  .count .digit{display:inline-block;width:.62em;text-align:center}
+  .count .digit.rollIn{animation:rollIn .5s cubic-bezier(.2,.9,.3,1)}
+  @keyframes rollIn{
+    from{transform:translateY(-.42em) scale(.94);opacity:0}
+    to{transform:none;opacity:1}
+  }
+  .count .sep{display:inline-block;width:.3em;text-align:center;font-size:.72em;opacity:.22;vertical-align:.06em;font-weight:700}
+  .label{font-size:clamp(12px,1.6vmin,16px);font-weight:700;color:var(--dim);letter-spacing:.42em;padding-left:.42em}
+
+  /* 「+N」徽章 */
+  .growpop{
+    position:absolute;left:calc(100% + 14px);bottom:16%;
+    padding:8px 15px;border-radius:999px;
+    background:var(--up);color:#fff;
+    font-size:clamp(16px,2.6vmin,27px);font-weight:800;white-space:nowrap;
+    border:3px solid var(--bg);
+  }
+  .growpop.show{animation:popIn 4.6s cubic-bezier(.2,1.4,.35,1) forwards}
+  @keyframes popIn{
+    0%{opacity:0;transform:translateY(16px) scale(.82)}
+    9%{opacity:1;transform:translateY(0) scale(1.1)}
+    15%{transform:scale(1)}
+    78%{opacity:1;transform:none}
+    100%{opacity:0;transform:translateY(-14px) scale(.98)}
+  }
+
+  /* =========================================================================
+     横竖屏自适应
+     · 竖屏（data-ori="portrait"）：单列纵向流，数字按「宽度」约束
+     · 横屏（data-ori="landscape"）：左右两栏，数字按「高度」约束
+     · 数字的实际字号不靠 CSS 估算，而是由 fitCount() 测量真实渲染尺寸后
+       用 zoom / transform:scale 精确缩放到「刚好撑满可用空间」
+     ========================================================================= */
+  body[data-ori="portrait"] .main{
+    gap:clamp(8px,1.6vh,20px);padding:2vh 0;
+    flex:1;min-height:0;                    /* 撑满剩余高度，避免竖屏上下空 */
+    justify-content:space-between;          /* 上下贴边 + 中间均分，消灭大片留白 */
+  }
+  body[data-ori="portrait"] .account{padding:8px 16px 8px 8px;gap:12px}
+  body[data-ori="portrait"] .account .avwrap,
+  body[data-ori="portrait"] .account img{width:clamp(44px,11vw,64px);height:clamp(44px,11vw,64px)}
+  body[data-ori="portrait"] .account .uidtag{display:none}   /* 竖屏窄，UID 挪到底部信息行 */
+  /* 竖屏：数字按宽度撑满后，纵向剩余空间交给走势图
+     注意必须有上限：窄屏（手机）可以贪心多占，宽窗口（电脑竖屏）要收着，
+     否则图表会一路长到几百像素、把数字挤小 */
+  body[data-ori="portrait"] .chartbox{
+    width:100%;flex:1 1 auto;
+    min-height:clamp(80px,min(18vh,22vw),150px);
+    max-height:clamp(160px,30vh,290px);
+    height:auto;
+  }
+  /* 矮屏（手机横屏只有 360px 高）：图表让位，先保证所有内容都放得下 */
+  @media (max-height:460px){
+    .chartbox{min-height:46px;padding-top:26px}
+  }
+  body[data-ori="portrait"] .delta{gap:8px}
+  body[data-ori="portrait"] .count-wrap{flex:0 0 auto;min-height:0}
+
+  /* 涨粉徽章在竖屏时压在数字右上角，避免超出屏幕 */
+  body[data-ori="portrait"] .growpop{
+    left:auto;right:-2px;bottom:calc(100% - 4px);
+    font-size:clamp(15px,4.2vw,24px);padding:7px 13px;
+  }
+
+  /* 横屏：左＝账号+走势图+状态，右＝超大数字（数字独占宽栏，才能真正放大） */
+  body[data-ori="landscape"] .main{
+    display:grid;
+    grid-template-columns:minmax(0,0.85fr) minmax(0,1fr);   /* minmax(0,·) 防止内容撑破栏宽 */
+    gap:clamp(10px,2.6vh,28px);
+    align-items:stretch;padding:0;justify-content:normal;
+    flex:1;min-height:0;
+  }
+  body[data-ori="landscape"] .col-side{
+    display:flex;flex-direction:column;justify-content:center;gap:clamp(8px,2vh,22px);
+    min-width:0;min-height:0;
+  }
+  body[data-ori="landscape"] .col-num{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:clamp(4px,1.2vh,14px);min-width:0;min-height:0;
+    border-left:2px solid var(--line);padding-left:clamp(10px,2.6vh,28px);
+  }
+  body[data-ori="landscape"] .col-num .count-wrap{width:100%;max-width:100%;min-width:0}
+  /* 图表弹性吃掉剩余高度：数字受宽度限制长不高，余量给它，两侧才平衡（同样要设上限）
+     下限用了 min(...)：手机横屏只有 360px 高，必须允许图表压到 ~54px 才放得下 */
+  body[data-ori="landscape"] .chartbox{
+    width:100%;flex:1 1 auto;
+    min-height:clamp(54px,min(24vh,30vw),150px);
+    max-height:clamp(120px,36vh,230px);
+    height:auto;
+  }
+  body[data-ori="landscape"] .label{font-size:clamp(11px,1.7vh,15px)}
+  body[data-ori="landscape"] .delta{justify-content:center;gap:6px}
+  body[data-ori="landscape"] .delta .pill{font-size:clamp(10px,1.5vh,14px);padding:2px 9px}
+  body[data-ori="landscape"] .topbar{min-height:32px}
+  body[data-ori="landscape"] .footer{
+    justify-content:flex-start;text-align:left;font-size:clamp(11px,1.5vh,13px);min-height:0;
+  }
+  body[data-ori="landscape"] .account{padding:7px 16px 7px 7px}
+  body[data-ori="landscape"] .account .avwrap,
+  body[data-ori="landscape"] .account img{width:clamp(36px,8.5vh,56px);height:clamp(36px,8.5vh,56px)}
+
+  /* 宽度富余时（横屏），涨粉徽章放到数字右侧 */
+  @media (min-aspect-ratio:1/1){
+    .growpop{left:calc(100% + 12px);right:auto;bottom:22%}
+  }
+  /* 竖屏兜底：即使 data-ori 没生效，也按窄屏排版（数字由 fitCount 兜底缩放） */
+  @media (max-aspect-ratio:1/1){
+    .growpop{left:auto;right:-2px;bottom:calc(100% - 4px)}
+    .main{flex:1;min-height:0;gap:clamp(8px,1.6vh,20px)}
+    .chartbox{width:100%}
+  }
+  /* 矮屏兜底（手机横屏）：图表让位，先保证内容不溢出屏幕 */
+  @media (max-height:460px){
+    .chartbox{min-height:46px;padding-top:26px}
+    .topbar{min-height:30px}
+    /* 矮屏（手机横屏）优先保证数字和图表：视频列表让位，竖屏下仍正常显示 */
+    body[data-ori="landscape"] .videos{display:none}
+  }
+
+  /* 竖屏：视频列表放最下面，占一小块 */
+  body[data-ori="portrait"] .videos{width:100%}
+  /* 横屏：视频列表在左栏底部，最多 3 条，超出内部滚动 */
+  body[data-ori="landscape"] .videos{width:100%;max-height:34vh;overflow:auto}
+  body[data-ori="landscape"] .vitem{padding:6px 12px;font-size:clamp(11px,1.6vh,14px)}
+  body[data-ori="landscape"] .vcap{padding:5px 12px;font-size:10px}
+
+  /* ---- 涨跌行 ---- */
+  .delta{display:flex;align-items:center;gap:16px;font-size:clamp(12px,1.75vmin,17px);color:var(--dim);min-height:1.5em;flex-wrap:wrap;justify-content:center}
+  .delta .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    border:2px solid var(--line);border-radius:999px;padding:3px 12px;font-weight:600;
+  }
+  .delta .pill b{color:var(--text);font-weight:700}
+  .delta .up{color:var(--up);border-color:currentColor}
+  .delta .down{color:var(--down);border-color:currentColor}
+  .delta .same{color:var(--dim)}
+
+  /* ---- 走势图（平面） ---- */
+  .chartbox{
+    width:min(900px,92vw);height:clamp(84px,15vh,180px);
+    background:var(--surface);border:2px solid var(--line);border-radius:var(--r);
+    /* 上内边距要留够，否则左上角标题 / 右上角时间按钮会压到折线上 */
+    padding:34px 12px 12px;position:relative;overflow:hidden;
+  }
+  body.no-chart .chartbox{display:none}
+  .chartbox svg{width:100%;height:100%;display:block}
+  .chartbox .empty{
+    position:absolute;inset:0;display:grid;place-items:center;
+    font-size:12px;color:var(--dim);font-weight:500;
+  }
+  .chartbox .cap{position:absolute;top:9px;left:14px;font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.04em}
+  .range{position:absolute;top:7px;right:9px;display:flex;gap:5px}
+  .range button{
+    border:2px solid var(--line);background:var(--surface-2);color:var(--dim);
+    border-radius:8px;padding:3px 9px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;
+  }
+  .range button.on{background:var(--pink);border-color:var(--pink);color:var(--pink-ink)}
+
+  /* ---- 最新视频（纯文字，平面风格） ---- */
+  .videos{
+    width:min(900px,92vw);flex:0 0 auto;
+    background:transparent;border:2px solid var(--line);border-radius:var(--r);
+    padding:0;overflow:hidden;
+  }
+  body.no-videos .videos{display:none}
+  .vcap{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:7px 14px;border-bottom:2px solid var(--line);
+    font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.06em;
+  }
+  .vcap .vmeta{font-weight:500;letter-spacing:0;opacity:.85}
+  .vlist{display:flex;flex-direction:column}
+  .vitem{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 14px;border-bottom:2px solid var(--line);
+    font-size:clamp(12px,1.9vmin,15px);min-width:0;
+  }
+  .vitem:last-child{border-bottom:none}
+  .vitem .vt{
+    flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-weight:600;color:var(--text);
+  }
+  .vitem .vp{
+    flex:0 0 auto;font-weight:800;color:var(--pink);
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+  }
+  .vitem .vp::after{content:"播放";font-size:.72em;font-weight:600;color:var(--dim);margin-left:3px;letter-spacing:.04em}
+  .vempty{padding:11px 14px;font-size:12px;color:var(--dim);font-weight:500}
+  .videos.stale .vcap{color:#f0a020}
+  :root[data-theme="oled"] .videos{border-color:var(--line)}
+  :root[data-theme="oled"] .vitem .vp{color:var(--pink)}
+
+  /* ---- 底栏 ---- */
+  .footer{
+    display:flex;align-items:center;justify-content:center;gap:8px 16px;flex-wrap:wrap;
+    font-size:12px;font-weight:500;color:var(--dim);min-height:1.7em;text-align:center;
+  }
+  .footer .err{color:var(--down);font-weight:700}
+  .footer .warn{color:#f0a020}
+  .footer .ok{color:var(--up);font-weight:700}
+  .linkbtn{
+    background:var(--surface);border:2px solid var(--line);color:var(--text);
+    font-family:inherit;font-size:12px;font-weight:700;border-radius:8px;padding:3px 10px;cursor:pointer;
+  }
+
+  /* ---- 沉浸模式 ---- */
+  body.immersive .topbar,body.immersive .chartbox,body.immersive .footer{opacity:0;pointer-events:none;transition:opacity .25s linear}
+  .topbar,.chartbox,.footer{transition:opacity .25s linear}
+
+  /* ============ 设置面板 ============ */
+  .sheet{
+    position:fixed;inset:0;z-index:20;display:none;
+    background:rgba(6,8,12,.7);
+    padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);
+    overflow:auto;
+  }
+  :root[data-theme="light"] .sheet{background:rgba(30,36,52,.45)}
+  .sheet.open{display:block}
+  .card{
+    width:min(580px,100%);margin:0 auto;background:var(--surface);
+    border:2px solid var(--line);border-radius:18px;padding:20px 20px 24px;
+    box-shadow:0 12px 0 -4px rgba(0,0,0,.28);
+  }
+  :root[data-theme="light"] .card{box-shadow:0 12px 0 -4px rgba(20,30,60,.10)}
+  .card h2{margin:0 0 6px;font-size:20px;letter-spacing:.01em}
+  .card p.hint{margin:0 0 15px;font-size:12.5px;color:var(--dim);line-height:1.75}
+  .field{margin:16px 0}
+  .field > label{display:block;font-size:12.5px;font-weight:700;color:var(--dim);margin-bottom:8px;letter-spacing:.03em}
+  input[type=text],input[type=number],select{
+    width:100%;padding:13px 14px;border-radius:10px;
+    background:var(--surface-2);border:2px solid var(--line);color:var(--text);
+    font-size:16px;font-weight:600;font-family:inherit;-webkit-appearance:none;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--pink)}
+  .row{display:flex;gap:10px;align-items:center}
+  .switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:2px solid var(--line)}
+  .switch:last-of-type{border-bottom:none}
+  .switch span{font-size:14px;font-weight:700}
+  .switch small{display:block;color:var(--dim);font-size:11.5px;font-weight:500;margin-top:4px;line-height:1.55}
+  .toggle{
+    position:relative;width:50px;height:29px;flex:0 0 auto;border-radius:999px;
+    background:var(--surface-2);border:2px solid var(--line);cursor:pointer;
+    transition:background .15s linear,border-color .15s linear;
+  }
+  .toggle::after{
+    content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;
+    background:var(--dim);transition:transform .15s ease-out,background .15s linear;
+  }
+  .toggle.on{background:var(--pink);border-color:var(--pink)}
+  .toggle.on::after{transform:translateX(21px);background:var(--pink-ink)}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+  .btn{
+    flex:1 1 130px;padding:14px 16px;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;
+    border:2px solid var(--line);background:var(--surface-2);color:var(--text);cursor:pointer;
+    transition:transform .08s linear;
+  }
+  .btn:active{transform:translateY(2px)}
+  .btn.primary{background:var(--pink);border-color:var(--pink);color:var(--pink-ink)}
+  .tips{margin:18px 0 0;padding:14px 16px;border-radius:12px;background:var(--surface-2);border:2px solid var(--line)}
+  .tips b{font-size:12.5px}
+  .tips ol{margin:9px 0 0;padding-left:20px;font-size:12.5px;color:var(--dim);line-height:1.9}
+  code.k{background:var(--surface-2);border:2px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700}
+  textarea{
+    width:100%;min-height:100px;padding:12px;border-radius:10px;font-size:12px;line-height:1.55;
+    background:var(--surface-2);border:2px solid var(--line);color:var(--text);
+    font-family:ui-monospace,Menlo,Consolas,monospace;resize:vertical;
+  }
+  details summary{cursor:pointer;font-size:12.5px;font-weight:700;color:var(--dim);padding:8px 0}
+  .hidden{display:none !important}
+
+  /* ---- 诊断 ---- */
+  .diag{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+  .diag .row2{
+    display:flex;gap:10px;align-items:flex-start;
+    padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:var(--surface-2);
+  }
+  .diag .st{font-weight:800;font-size:12px;flex:0 0 54px;padding-top:1px}
+  .diag .st.ok{color:var(--up)}
+  .diag .st.fail{color:var(--down)}
+  .diag .st.skip{color:var(--dim)}
+  .diag .txt{font-size:12px;line-height:1.6;word-break:break-all;font-weight:500}
+  .diag .txt .nm{font-weight:800;display:block;margin-bottom:2px}
+  .diag .txt .ms{color:var(--dim)}
+  .diag .txt .em{color:var(--down)}
+
+  /* ---- 顶部提示条 ---- */
+  .banner{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:12px 14px;border-radius:12px;
+    background:var(--surface);border:2px solid var(--down);
+    font-size:12.5px;line-height:1.75;font-weight:500;
+  }
+  .banner b{font-weight:800}
+  .banner .x{
+    flex:0 0 auto;background:none;border:none;color:var(--dim);
+    font-size:17px;line-height:1;cursor:pointer;padding:0 2px;font-family:inherit;
+  }
+  /* 提示条占据栅格第 2 行，其余行由 .stage 的统一模板负责（见文件顶部） */
+  .stage.has-banner{grid-template-rows:auto auto 1fr auto}
+  /* Phone layout: each section owns a row; controls never cover text. */
+  .stage,.stage.has-banner{grid-template-rows:auto minmax(0,1fr);gap:12px}
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,44px);gap:8px;min-width:0}
+  .topbar .brand{grid-column:1;grid-row:1;min-width:0;letter-spacing:0;gap:8px}
+  .brand>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .brand small,.topbar .spacer{display:none}
+  .topbar .chip{grid-column:1;grid-row:2;justify-self:start;max-width:100%;padding:5px 10px}
+  #status-text{overflow:hidden;text-overflow:ellipsis}
+  .topbar .iconbtn{width:44px;height:44px;grid-row:1 / span 2;align-self:center}
+  #btn-refresh{grid-column:2}#btn-theme{grid-column:3}#btn-settings{grid-column:4}
+  .main{min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+  body[data-ori="portrait"] .main{display:grid;grid-template-columns:minmax(0,1fr);
+    grid-template-rows:max-content max-content max-content minmax(min-content,1fr) max-content max-content;align-items:stretch;
+    justify-content:normal;gap:8px;padding:8px 0 12px}
+  body[data-ori="portrait"] .col-side,body[data-ori="portrait"] .col-num{display:contents}
+  body[data-ori="portrait"] .account{grid-row:1;justify-self:center}
+  body[data-ori="portrait"] .count-wrap{grid-row:2;width:100%;padding:12px 0 0}
+  body[data-ori="portrait"] .delta{grid-row:3}
+  body[data-ori="portrait"] .chartbox{grid-row:4}
+  body[data-ori="portrait"] .videos{grid-row:5}
+  body[data-ori="portrait"] .footer{grid-row:6}
+  .banner{grid-column:1 / -1;grid-row:1}
+  .account{max-width:100%;min-width:0}
+  .account .who{flex:1;min-width:0}
+  .account .name,.account .sign{max-width:100%}
+  .account .uidtag{display:none}
+  body[data-ori="landscape"] .main{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);
+    gap:16px;align-items:stretch;padding:4px 0 8px}
+  body[data-ori="landscape"] .col-side{justify-content:flex-start;gap:10px;overflow:auto;padding:2px}
+  body[data-ori="landscape"] .col-num{padding:12px;gap:12px}
+  body[data-ori="landscape"] .count-wrap{flex:1;min-height:100px}
+  body[data-ori="landscape"] .videos{display:block;max-height:none;overflow:visible}
+  body[data-ori="portrait"] .chartbox,body[data-ori="landscape"] .chartbox{
+    display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(44px,1fr);
+    gap:8px;width:100%;height:auto;min-height:min-content;max-height:none;padding:12px;flex:1 0 150px}
+  body.no-chart .chartbox{display:none}
+  .chartbox .cap{position:static;line-height:1.5;overflow-wrap:anywhere;letter-spacing:0}
+  .range{position:static;display:flex;gap:6px;flex-wrap:wrap}
+  .range button{min-height:36px;padding:6px 10px;flex:1;white-space:nowrap}
+  .chartbox svg{min-height:44px;grid-row:3}
+  .chartbox .empty{inset:auto 12px 14px;text-align:center;line-height:1.6;pointer-events:none;font-size:11px}
+  .growpop,body[data-ori="portrait"] .growpop{position:static;min-height:0;padding:0;border:0;
+    background:none;color:var(--up);font-size:18px;line-height:1.4;opacity:0}
+  .growpop:empty{display:none}
+  .vcap{flex-wrap:wrap;line-height:1.5;letter-spacing:0}
+  .vmeta{overflow-wrap:anywhere;min-width:0}
+  .videos{min-height:max-content}
+  .vempty,.footer>span{overflow-wrap:anywhere;min-width:0;line-height:1.6}
+  .footer{gap:4px 10px;padding:4px 0}
+  .sheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .card{padding:18px 16px 24px;min-width:0}
+  .card .hint,.switch>span{overflow-wrap:anywhere}
+  .switch>span{flex:1;min-width:0;line-height:1.5}
+  .row{flex-wrap:wrap;align-items:flex-start}
+  .row>span{flex:1 1 130px;line-height:1.6}
+  .btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+  .btn{min-width:0;min-height:48px;white-space:normal;line-height:1.5}
+  #btn-save{grid-column:1 / -1}
+  .native-controls{display:block;width:100%;margin:16px 0 0}
+  @media(max-height:460px){
+    body[data-ori="landscape"] .videos{display:none}
+    body[data-ori="landscape"] .col-side{gap:6px}
+    body[data-ori="landscape"] .account{padding:5px 10px 5px 5px;gap:8px}
+    body[data-ori="landscape"] .account .avwrap,body[data-ori="landscape"] .account img{width:32px;height:32px}
+    body[data-ori="landscape"] .chartbox{min-height:min-content;flex:1 0 auto;padding:10px;
+      grid-template-rows:auto auto minmax(24px,1fr)}
+    body[data-ori="landscape"] .chartbox svg{min-height:24px}
+    body[data-ori="landscape"] .footer{font-size:10.5px}
+  }
+  @media(max-width:360px){.stage{padding-left:12px;padding-right:12px}
+    .topbar{grid-template-columns:minmax(0,1fr) repeat(3,40px);gap:6px}
+    .topbar .iconbtn{width:40px;height:44px}.brand{font-size:12px}.brand .tv{display:none}}
+  :root{--accent:#fb7299;--on-accent:#171018;--accent-soft:#36232e}
+  button,input,select{font-family:inherit}
+  .btn,.iconbtn,.linkbtn,.range button{background:var(--accent-soft);border-color:var(--accent);color:var(--text);box-shadow:none}
+  .btn.primary,.range button.on,.toggle.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  :root[data-theme="oled"] .range button{border-color:var(--accent);color:var(--text)}
+  :root[data-theme="oled"] .range button.on{background:var(--accent);color:var(--on-accent)}
+  .toggle{border-color:var(--accent)}.toggle.on::after{background:var(--on-accent)}
+  button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+  .card h3{font-size:15px;margin:24px 0 12px;color:var(--text)}
+  .color-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  input[type="color"]{width:60px;height:44px;border:2px solid var(--accent);border-radius:8px;background:var(--surface)}
+  input[type="range"]{width:100%;accent-color:var(--accent)}
+  .inline-error{color:var(--down);font-size:13px;line-height:1.6}
+  .author{margin-top:20px;padding:16px;border:1px solid var(--line);border-radius:12px;line-height:1.8;font-size:13px}
+  a{color:var(--accent-ink,var(--accent))}
+  .welcome{position:fixed;inset:0;z-index:40;background:var(--bg);overflow:auto;padding:24px 16px;display:grid;place-items:center}
+  .welcome-card{width:min(440px,100%);animation:welcomeIn .55s ease-out}
+  .welcome-mark{width:68px;height:68px;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);border-radius:20px;font-size:36px;font-weight:800;margin-bottom:20px;animation:markIn .7s ease-out}
+  .welcome h1{font-size:28px;margin:0 0 10px;line-height:1.3}.welcome p{font-size:14px;line-height:1.8;color:var(--dim)}
+  .welcome label{display:block;margin:18px 0 8px;font-size:14px;font-weight:700}
+  .welcome .btn{width:100%;margin-top:12px}.welcome .steps{color:var(--accent-ink,var(--accent));font-size:12px}
+  .vitem .vp,:root[data-theme="oled"] .vitem .vp{color:var(--accent-ink,var(--accent))}
+  .welcome li{font-size:14px;line-height:1.9;color:var(--dim);margin:8px 0}.welcome ul{padding-left:20px}
+  .welcome .guide-page{animation:welcomeIn .3s ease-out}
+  .welcome input{user-select:text}
+  .guide-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .guide-actions .btn{margin-top:12px}
+  .welcome .check-row{display:flex;align-items:center;gap:12px;font-size:14px;line-height:1.6}
+  .check-row input{width:20px;height:20px;accent-color:var(--accent);flex-shrink:0}
+  .help-actions{display:grid;grid-template-columns:1fr;gap:8px;margin-top:12px}
+  .help-actions .btn{font-size:13px;padding:10px}
+  .stage.orientation-enter,.card.orientation-enter{animation:orientationEnter .4s ease-out}
+  @keyframes welcomeIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  @keyframes markIn{from{opacity:0;transform:scale(.65) rotate(-12deg)}to{opacity:1;transform:none}}
+  @keyframes orientationEnter{from{opacity:.25}to{opacity:1}}
+  @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+.chart-plot{position:relative;min-width:0;min-height:44px;grid-row:3;overflow:hidden}
+.chartbox .chart-plot svg{position:absolute;inset:0;width:100%;height:100%;min-height:0}
+@media(max-height:460px){body[data-ori="landscape"] .chart-plot{min-height:24px}body[data-ori="landscape"] .chart-plot svg{min-height:0}}
+body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!important; }
+.animations-off *, .animations-off *::before, .animations-off *::after { animation:none!important; transition:none!important; }
+.editor { z-index:120; } .editor .card { width:min(100%,520px); }
+.profile-preview { width:96px;height:96px;object-fit:cover;border-radius:24px;background:var(--accent-soft); }
+#account,#count { touch-action:pan-y; -webkit-user-select:none; user-select:none; }
+.growpop { max-width:100%; font-size:clamp(12px,3vw,22px); overflow-wrap:anywhere; color:var(--accent);font-weight:900; }
+</style>
+</head>
+<body>
+
+<!-- ================= 嵌入配置：想批量部署时改这里即可 ================= -->
+<script type="application/json" id="default-config">
+{
+  "uids": "",
+  "intervalSec": 90,
+  "showChart": true,
+  "theme": "dark",
+  "server": "",
+  "demo": false,
+  "wakeLock": true,
+  "immersive": false,
+  "hideCount": false,
+  "oled": false,
+  "dim": 0,
+  "showVideos": true
+}
+</script>
+
+<div class="stage">
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand"><span class="tv">B</span><span>粉丝数看板 <small>· 实时</small></span></div>
+    <div class="spacer"></div>
+    <div class="chip" id="chip-status"><i class="dot pulse" id="dot"></i><span id="status-text">初始化…</span></div>
+    <button class="iconbtn" id="btn-refresh" title="立即刷新">⟳</button>
+    <button class="iconbtn" id="btn-theme" title="切换主题">◐</button>
+    <button class="iconbtn" id="btn-settings" title="设置">⚙</button>
+  </header>
+
+  <!-- 主区：col-left / col-right 只在横屏时分成两栏，竖屏下是普通纵向排列 -->
+  <main class="main">
+    <div class="banner hidden" id="banner">
+      <span id="banner-text"></span>
+      <button class="x" id="banner-x" title="关闭">✕</button>
+    </div>
+
+    <div class="col-side">
+      <div class="account hidden" id="account">
+        <span class="avwrap"><img id="avatar" alt="" referrerpolicy="no-referrer"></span>
+        <div class="who">
+          <div class="name" id="uname">—</div>
+          <div class="sign" id="usign">正在读取…</div>
+        </div>
+        <span class="uidtag" id="uidtag"></span>
+      </div>
+
+      <div class="chartbox">
+        <span class="cap" id="chart-cap">粉丝变化</span>
+        <div class="range">
+          <button data-range="1" class="on">1 小时</button>
+          <button data-range="6">6 小时</button>
+          <button data-range="24">24 小时</button>
+        </div>
+        <div class="chart-plot"><svg id="spark" viewBox="0 0 600 100" preserveAspectRatio="none"></svg></div>
+        <div class="empty" id="chart-empty">正在积累数据点…（每次刷新记录一次）</div>
+      </div>
+
+      <!-- 最新 3 个视频（纯文字：标题 + 播放量） -->
+      <div class="videos" id="videos">
+        <div class="vcap">
+          <span>最新作品</span>
+          <span class="vmeta" id="vmeta"></span>
+        </div>
+        <div class="vlist" id="vlist">
+          <div class="vempty" id="vempty">正在读取视频列表…</div>
+        </div>
+      </div>
+
+      <footer class="footer">
+        <span id="foot-left">—</span>
+        <span id="foot-mid"></span>
+        <span id="foot-right"></span>
+        <button class="linkbtn hidden" id="btn-retry">重试</button>
+      </footer>
+    </div>
+
+    <div class="col-num">
+      <div class="count-wrap">
+        <div class="count placeholder" id="count"><span class="count-inner">等待数据</span></div>
+        <div class="label" id="count-label">粉丝数</div>
+        <div class="growpop" id="growpop" aria-hidden="true"></div>
+      </div>
+
+      <div class="delta" id="delta"></div>
+    </div>
+  </main>
+</div>
+
+<!-- ================= 设置面板 ================= -->
+<div class="sheet" id="sheet">
+  <div class="card">
+    <h2>设置</h2>
+    <p class="hint real-only">填好 UID 后点「保存并刷新」。UID 在 UP 主个人空间地址里：<code class="k">space.bilibili.com/<b>123456</b></code>（多个账号用英文逗号隔开）。</p>
+
+    <div class="field real-only">
+      <label for="f-uids">B站 UID</label>
+      <input type="text" id="f-uids" inputmode="numeric" placeholder="例如 2 或 2,703007996" autocomplete="off">
+      <p class="hint" style="margin:8px 0 0">支持多个，会按顺序轮播显示每个账号的粉丝数。</p>
+    </div>
+
+    <div class="field real-only">
+      <label for="f-interval">刷新间隔</label>
+      <div class="row">
+        <input type="number" id="f-interval" min="10" max="3600" step="10" style="flex:0 0 120px">
+        <span style="font-size:13px;color:var(--dim)">秒（建议 60–180，别低于 30）</span>
+      </div>
+      <p class="hint" style="margin:8px 0 0">实际触发时间会在设定值上下浮动 ±20%，避免固定节奏被判定为脚本；请求失败会自动退避重试。</p>
+    </div>
+
+    <div class="switch">
+      <span>显示走势图<small>本机记录每次刷新的粉丝数</small></span>
+      <button class="toggle" id="t-chart"></button>
+    </div>
+    <div class="switch">
+      <span>保持屏幕常亮<small>需要浏览器支持；充电时用最稳</small></span>
+      <button class="toggle" id="t-wake"></button>
+    </div>
+    <div class="switch">
+      <span>纯黑背景<small>开：纯黑主题；关：普通深色主题，适合 OLED 屏幕</small></span>
+      <button class="toggle" id="t-theme"></button>
+    </div>
+    <div class="switch">
+      <span>OLED 防烧屏<small>纯黑背景 + 内容每 45 秒轻微位移 + 亮度下调，长期挂着必备</small></span>
+      <button class="toggle" id="t-oled"></button>
+    </div>
+    <div class="switch real-only">
+      <span>显示最新作品<small>最近发布 3 个视频的标题与播放量（需本地服务）</small></span>
+      <button class="toggle" id="t-videos"></button>
+    </div>
+    <div class="switch">
+      <span>隐藏数字<small>只显示涨跌趋势，不显示具体粉丝数</small></span>
+      <button class="toggle" id="t-hide"></button>
+    </div>
+    <div class="switch">
+      <span>演示模式<small>不联网，用假数据检查显示效果</small></span>
+      <button class="toggle" id="t-demo"></button>
+    </div>
+
+    <div class="switch"><span>界面与涨粉动画<small>关闭数字翻滚、连击和转屏动画，减少性能开销</small></span><button class="toggle" id="t-animations"></button></div>
+    <div class="field"><button class="btn" id="btn-profile">自定义昵称、头像和简介</button><p class="hint">仅修改本机显示，按账号分别保存；可一键恢复 UID 原始资料。</p></div>
+    <section class="demo-only">
+      <h3>演示实验室</h3><p class="hint">长按主页面粉丝数可修改数量，长按头像区域可修改资料。演示资料和走势独立保存在本机，不影响真实账号。</p>
+      <button class="btn" id="btn-demo-count">设置演示粉丝数</button>
+      <button class="btn" id="btn-demo-reset">清空演示数据</button>
+      <div class="field"><label for="f-demo-min">每天随机涨粉 · 最小值</label><input id="f-demo-min" type="number" min="1" max="10000" step="1"></div>
+      <div class="field"><label for="f-demo-max">每天随机涨粉 · 最大值</label><input id="f-demo-max" type="number" min="1" max="10000" step="1"></div>
+      <div class="field"><label for="f-demo-speed">演示时间速度</label><select id="f-demo-speed"><option value="1">正常 · 1 秒 = 1 秒</option><option value="60">加速 · 1 秒 = 1 分钟</option><option value="3600">快速预览 · 1 秒 = 1 小时</option></select><p class="hint">每个模拟日随机选取涨粉总量，分摊到全天。仅前台运行时增长，关闭应用后暂停；上限 10 亿，调低数量才会解锁。</p></div>
+    </section>
+    <h3>颜色与显示方向</h3>
+    <div class="field">
+      <label for="f-color-mode">按钮和强调色</label>
+      <select id="f-color-mode"><option value="default">默认粉色</option><option value="monet">莫奈取色 · 跟随系统壁纸</option><option value="custom">自定义颜色</option></select>
+      <div class="color-row" id="custom-color-row"><input type="color" id="f-accent" value="#fb7299" aria-label="自定义强调色"><span id="accent-value">#FB7299</span></div>
+      <p class="hint" id="color-hint">莫奈取色需 Android 12 及以上；不支持时使用默认配色。</p>
+    </div>
+    <div class="field">
+      <label for="f-orientation">屏幕方向</label>
+      <select id="f-orientation"><option value="auto">自动旋转</option><option value="portrait">固定竖屏</option><option value="landscape">固定横屏</option></select>
+      <p class="hint">选择「自动旋转」即可跟随手机横放、竖放；固定方向时不会跟随。立即生效并记住选择。</p>
+    </div>
+    <div class="switch">
+      <span>避开挖孔 / 刘海<small>为摄像头和屏幕缺口预留空间，横竖屏都生效</small></span>
+      <button class="toggle" id="t-cutout" aria-label="避开挖孔和刘海"></button>
+    </div>
+    <div class="field" id="cutout-margin-field">
+      <label for="f-safe-margin">额外安全边距 <span id="safe-margin-value">0 dp</span></label>
+      <input type="range" id="f-safe-margin" min="0" max="48" step="4" value="0">
+      <p class="hint">开启避让后，仍被摄像头遮挡可逐步增加边距。</p>
+    </div>
+    <p class="inline-error hidden" id="settings-error" role="alert"></p>
+
+    <details class="real-only">
+      <summary>高级选项（可选）</summary>
+      <div class="field">
+        <label for="f-server">自建代理地址</label>
+        <input type="text" id="f-server" placeholder="例如 http://192.168.31.205:8787" autocomplete="off">
+        <p class="hint" style="margin:8px 0 0">
+          最可靠的取数方式：电脑上跑 <code class="k">node server.js</code>，把打印出来的地址填到这里（手机与电脑连同一 WiFi 时填电脑的局域网地址，如 <code class="k">http://192.168.31.205:8787</code>；用电脑浏览器打开则填 <code class="k">http://127.0.0.1:8787</code>）。
+        </p>
+      </div>
+      <div class="field">
+        <label>连接诊断</label>
+        <button class="btn" id="btn-test" style="width:100%">测试四种取数方式，看到底卡在哪一步</button>
+        <div class="diag" id="diag"></div>
+      </div>
+      <div class="field">
+        <label>配置快照（可复制到 index.html 里做默认值）</label>
+        <textarea id="f-snapshot" readonly></textarea>
+        <div class="btns" style="margin-top:10px">
+          <button class="btn" id="btn-copy">复制配置</button>
+          <button class="btn" id="btn-clearhist">清空历史数据</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="btns">
+      <button class="btn real-only" id="btn-demo-once">演示一次</button>
+      <button class="btn" id="btn-close">关闭</button>
+      <button class="btn primary" id="btn-save">保存并刷新</button>
+    </div>
+
+    <div class="tips">
+      <b>如何让手机长期亮屏</b>
+      <ol>
+        <li>手机浏览器打开这个页面的地址</li>
+        <li>菜单里选「添加到主屏幕」，从桌面图标启动（无地址栏）</li>
+        <li>插上充电器，系统设置里关闭息屏 / 开启「充电时不锁屏」</li>
+        <li>点右上角 ⟳ 旁的 ⚙ 填 UID，然后点一下屏幕隐藏多余信息</li>
+      </ol>
+      <button class="btn" id="btn-guide" style="width:100%;margin-top:12px">重新查看首次使用引导</button>
+    </div>
+    <div class="author"><b>B站粉丝屏 · 1.3.1</b><br>作者：weeazn<br><a id="author-home" href="https://space.bilibili.com/67368617" rel="noopener noreferrer">访问作者 B站主页 ↗</a><br><span style="color:var(--dim)">非 B站官方应用。仅查询公开数据，无需账号密码。</span></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   B站粉丝数实时看板 —— 单文件版（无依赖、可离线打开）
+   数据源：官方公开接口
+     1) https://api.bilibili.com/x/relation/stat?jsonp=jsonp&vmid=<UID>
+        返回 { code:0, data:{ mid, following, follower } }
+     2) https://api.bilibili.com/x/web-interface/card?mid=<UID>&photo=true
+        返回 { code:0, data:{ card:{ name, face, sign }, follower } }
+   取数策略（自动降级）：本地代理 → JSONP 直连 → 公共 CORS 代理
+   ========================================================================= */
+
+/* ------------------------------ 小工具 ------------------------------ */
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function load(key, def) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw === null ? def : JSON.parse(raw);
+  } catch (_) { return def; }
+}
+function save(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (_) {}
+}
+
+/* 从 index.html 里读嵌入的默认配置 */
+const EMBEDDED = (() => {
+  try { return JSON.parse($("default-config").textContent); } catch (_) { return {}; }
+})();
+
+const DEFAULTS = {
+  uids: "",
+  intervalSec: 90,        // 降频轮询：默认 90 秒，避开 B 站风控
+  showChart: true,
+  theme: "dark",
+  server: "",
+  demo: false,
+  wakeLock: true,
+  hideCount: false,
+  oled: false,            // OLED 防烧屏
+  dim: 0,                 // 额外亮度下调比例 0~0.6
+  showVideos: true,       // 显示最新 3 个作品
+  colorMode: "default",
+  accent: "#fb7299",
+  orientation: "auto",
+  avoidCutout: true,
+  safeMargin: 0,
+  animations: true,
+  demoMin: 1, demoMax: 10000, demoSpeed: 1,
+  ...EMBEDDED
+};
+
+let CFG = { ...DEFAULTS, ...load("bili.cfg", {}) };
+if (!Array.isArray(CFG.uids)) {
+  CFG.uids = String(CFG.uids || "").split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+}
+const saveCfg = () => save("bili.cfg", CFG);
+
+/* ------------------------------ 取数 ------------------------------ */
+/* JSONP：无论 http/https/file 都能用，且不依赖任何第三方服务 */
+let jsonpSeq = 0;
+function jsonp(url, timeout = 8000) {
+  return new Promise((resolve, reject) => {
+    const cb = "bili_cb_" + Date.now().toString(36) + "_" + (++jsonpSeq);
+    const s = document.createElement("script");
+    let done = false;
+    const cleanup = () => {
+      try { delete window[cb]; } catch (_) { window[cb] = undefined; }
+      s.remove();
+    };
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true; cleanup(); reject(new Error("JSONP 超时"));
+    }, timeout);
+    window[cb] = (payload) => {
+      if (done) return;
+      done = true; clearTimeout(timer); cleanup();
+      payload ? resolve(payload) : reject(new Error("JSONP 空响应"));
+    };
+    s.onerror = () => {
+      if (done) return;
+      done = true; clearTimeout(timer); cleanup(); reject(new Error("JSONP 加载失败"));
+    };
+    s.src = url + (url.includes("?") ? "&" : "?") + "jsonp=jsonp&callback=" + cb + "&_=" + Date.now();
+    document.head.appendChild(s);
+  });
+}
+
+async function fetchJSON(url, timeout = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store", referrerPolicy: "no-referrer" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+
+/* 公共 CORS 代理（尽量走纯文本 / 最少加工的那种） */
+const PROXIES = [
+  (u) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u),
+  (u) => "https://corsproxy.io/?url=" + encodeURIComponent(u),
+  (u) => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u)
+];
+
+/* 官方接口地址 */
+const API_STAT = (uid) => "https://api.bilibili.com/x/relation/stat?vmid=" + uid;
+const API_CARD = (uid) => "https://api.bilibili.com/x/web-interface/card?mid=" + uid + "&photo=true";
+const withJsonp = (u) => u + "&jsonp=jsonp";
+
+/* 解析接口数据 */
+function parseStat(json) {
+  if (!json || typeof json !== "object") throw new Error("响应不是 JSON");
+  if (json.code !== 0) throw new Error("接口返回 code=" + json.code + (json.message ? " / " + json.message : ""));
+  const d = json.data || {};
+  const n = Number(d.follower);
+  if (!Number.isFinite(n)) throw new Error("响应里没有 follower 字段");
+  return { follower: n, following: Number(d.following) || 0 };
+}
+
+/* 先试自己所在的服务：如果页面本身就是 server.js 发出来的，取数成功率最高 */
+const pageServer = location.protocol.startsWith("http") ? location.origin : "";
+const nativeScreen = typeof window.BiliScreen !== "undefined";
+
+/* 一个 UID 的完整取数流程，返回 {name, face, sign, follower, following, source} */
+async function fetchUp(uid, onNote) {
+  const attempts = [];
+  const statUrl = API_STAT(uid);
+  const cardUrl = API_CARD(uid);
+
+  if (pageServer) {
+    attempts.push([nativeScreen ? "手机直连" : "同源服务", async () => parseStat(await fetchJSON(pageServer + "/api/stat?uid=" + encodeURIComponent(uid), nativeScreen ? 15000 : 5000))]);
+  }
+  if (CFG.server && CFG.server.replace(/\/+$/, "") !== pageServer) {
+    const base = String(CFG.server).replace(/\/+$/, "");
+    attempts.push(["自建代理", async () => {
+      const j = await fetchJSON(base + "/api/stat?uid=" + encodeURIComponent(uid));
+      return parseStat(j);
+    }]);
+  }
+  // 在 http(s) 页面上 JSONP 是原生可用的
+  if (!nativeScreen && location.protocol !== "file:") {
+    attempts.push(["官方接口(JSONP)", async () => parseStat(await jsonp(withJsonp(statUrl), 8000))]);
+  }
+  for (const p of nativeScreen ? [] : PROXIES) {
+    attempts.push(["公共代理", async () => parseStat(await fetchJSON(p(statUrl), 10000))]);
+  }
+
+  let lastErr = null, stat = null, usedSource = "";
+  for (const [label, fn] of attempts) {
+    try {
+      stat = await fn();
+      usedSource = label;
+      break;
+    } catch (e) {
+      lastErr = e;
+      onNote && onNote(label + "失败：" + e.message);
+    }
+  }
+  if (!stat) throw lastErr || new Error("取数失败");
+
+  /* 昵称 / 头像：失败不影响主数据 */
+  let meta = null;
+  try {
+    const tries = [];
+    const servers = [pageServer, String(CFG.server || "").replace(/\/+$/, "")].filter((s, i, a) => s && a.indexOf(s) === i);
+    for (const s of servers) tries.push(async () => {
+      const j = await fetchJSON(s + "/api/card?uid=" + uid, nativeScreen ? 15000 : 6000);
+      if (j && j.data && j.data.card) return j;          // 服务端可能直接返回 card 对象
+      return j;
+    });
+    if (!nativeScreen && location.protocol !== "file:") tries.push(() => jsonp(cardUrl + "&jsonp=jsonp", 8000));
+    for (const p of nativeScreen ? [] : PROXIES) tries.push(() => fetchJSON(p(cardUrl), 9000));
+    for (const t of tries) {
+      try {
+        const j = await t();
+        if (j && j.code === 0 && j.data && j.data.card) {
+          const c = j.data.card;
+          meta = { name: c.name || "", face: c.face || "", sign: c.sign || "" };
+          break;
+        }
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  return { uid: String(uid), ...stat, ...(meta || {}), source: usedSource };
+}
+
+/* ------------------------------ 历史记录 ------------------------------ */
+/* 曲线只能靠自己攒（B站的历史粉丝数接口需要登录，公开接口拿不到），所以采样策略要兼顾两头：
+   · 刚打开的一段时间里「密采样」—— 每分钟一个点，几分钟就能画出真实曲线
+   · 打开久了之后「稀采样」—— 10 分钟一个点，为天/周级别保留跨度
+   这样「每次打开图表都是空的」就不会再发生。 */
+const HIST_KEY = "bili.hist";
+let HIST = load(HIST_KEY, {}); // { uid: [{t, v}, ...] }
+const DENSE_MS = 15 * 60 * 1000;   // 前 15 分钟密采样
+
+function pushHist(uid, v) {
+  const arr = HIST[uid] || (HIST[uid] = []);
+  const last = arr[arr.length - 1];
+  const startedAt = state.startedAt || Date.now();
+  const dense = Date.now() - startedAt < DENSE_MS;
+  const gap = dense ? 45 * 1000 : Math.max(10 * 60 * 1000, (Number(CFG.intervalSec) || 90) * 2000);
+  if (!last || last.v !== v || Date.now() - last.t > gap) arr.push({ t: Date.now(), v });
+  const cut = Date.now() - 14 * 24 * 3600 * 1000;
+  HIST[uid] = arr.filter((p) => p.t >= cut).slice(-5000);
+  save(HIST_KEY, HIST);
+}
+function histIn(uid, hours) {
+  const arr = HIST[uid] || [];
+  const from = Date.now() - hours * 3600 * 1000;
+  const out = arr.filter((p) => p.t >= from);
+  return out.length >= 2 ? out : arr.slice(-2);
+}
+/* 历史点数与时间跨度，用于界面提示 */
+function histStat(uid) {
+  const arr = HIST[uid] || [];
+  if (!arr.length) return { n: 0 };
+  return { n: arr.length, from: arr[0].t, to: arr[arr.length - 1].t };
+}
+/* 找 hours 小时之前最近的一个记录点（用于算涨跌） */
+function pointAgo(uid, hours) {
+  const arr = HIST[uid] || [];
+  const target = Date.now() - hours * 3600 * 1000;
+  let best = null;
+  for (const p of arr) if (p.t <= target) best = p;
+  return best;
+}
+function valueAgo(uid, hours) {
+  const p = pointAgo(uid, hours);
+  return p ? p.v : null;
+}
+/* 把这个时间点说成人话：「24 小时前」「3 小时前」 */
+function sinceTxt(t) {
+  if (!t) return "";
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 2) return "刚刚";
+  if (m < 60) return m + " 分钟前";
+  const h = Math.round(m / 60);
+  if (h < 24) return h + " 小时前";
+  const d = Math.round(h / 24);
+  return d + " 天前";
+}
+
+/* ------------------------------ 渲染 ------------------------------ */
+const fmt = new Intl.NumberFormat("zh-CN");
+const nf = (n) => fmt.format(Math.round(n));
+const escapeHTML = (value) => String(value == null ? "" : value).replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clock = (t) => new Date(t).toLocaleTimeString("zh-CN", { hour12: false });
+const ago = (t) => {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 10) return "刚刚";
+  if (s < 60) return s + " 秒前";
+  if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+  return Math.floor(s / 3600) + " 小时前";
+};
+
+/* 把数字逐位拆成 span：等宽 + 只有变化的那几位做翻滚动画（写入内层容器） */
+function renderCount(n, animate) {
+  animate = animate && CFG.animations;
+  const el = $("count");
+  const inner = el.querySelector(".count-inner") || el;
+  el.classList.remove("placeholder");
+  const str = CFG.hideCount ? "••••" : nf(n);
+  const prev = el.dataset.v || "";
+  const oldDigits = [...inner.querySelectorAll(".digit")].map((d) => d.textContent);
+  el.dataset.v = str;
+
+  let di = 0;
+  const frag = document.createDocumentFragment();
+  for (const ch of str) {
+    if (ch === ",") {
+      const s = document.createElement("span");
+      s.className = "sep";
+      s.textContent = ",";
+      frag.appendChild(s);
+      continue;
+    }
+    const s = document.createElement("span");
+    s.className = "digit";
+    s.textContent = ch;
+    const changed = animate && prev && oldDigits[di] !== undefined && oldDigits[di] !== ch;
+    if (changed) s.classList.add("rollIn");
+    frag.appendChild(s);
+    di++;
+  }
+  inner.replaceChildren(frag);
+  fitCount();
+}
+
+/* ------------------------------ 数字自适应缩放 ------------------------------ */
+/* 不靠 CSS 估算字号（手机字体数字宽度千差万别，必然估算失误），
+   而是测量真实渲染尺寸，再用 zoom / transform:scale 精确缩放到刚好撑满可用空间。
+   · 基准字号在 CSS 里固定 100px，所以「自然尺寸 = 测量值」，换算比例很直观
+   · 优先用 zoom：它会同步改变布局尺寸，父容器 flex 居中即可天然居中
+   · 不支持 zoom 的浏览器退回 transform: scale()：布局尺寸不变，需要负 margin 抵消 */
+const ZOOM_OK = (() => {
+  try {
+    const d = document.createElement("div");
+    d.style.zoom = "2";
+    return d.style.zoom === "2";
+  } catch (_) { return false; }
+})();
+
+const fitState = { w: 0, h: 0 };
+function fitCount() {
+  const el = $("count");
+  const wrap = el.closest(".count-wrap");
+  if (!wrap || el.classList.contains("placeholder")) return;
+  el.style.zoom = "1";
+  el.style.transform = "none";
+  el.style.margin = "0";
+  el.style.fontSize = "100px";
+  const inner = el.querySelector(".count-inner") || el;
+  const baseW = inner.getBoundingClientRect().width;
+  const baseH = el.getBoundingClientRect().height;
+  if (!baseW || !baseH) return;
+  const cs = getComputedStyle(wrap);
+  const width = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const fill = Math.min(1, Math.max(0.5, Number(CFG.fill) || 0.94));
+  let scale = width * fill / baseW;
+  if (document.body.dataset.ori === "landscape") {
+    const others = [...wrap.children].filter(c => c !== el && c.offsetParent !== null);
+    const gap = parseFloat(cs.rowGap) || 0;
+    const used = others.reduce((sum, c) => sum + c.offsetHeight, 0) + gap * others.length;
+    const height = wrap.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - used;
+    scale = Math.min(scale, Math.max(40, height) / baseH);
+  }
+  el.style.fontSize = Math.max(16, Math.min(1000, 100 * scale)) + "px";
+}
+
+/* 容器尺寸变化时重新适配（脚本在 body 末尾，这里 DOM 已就绪）
+   同时观察 .chartbox：它的高度决定 viewBox 长宽比，变了就要重画折线 */
+const fitObserver = (() => {
+  if (typeof ResizeObserver === "undefined") return null;
+  try {
+    const ro = new ResizeObserver(() => refitAndRedraw());
+    const wrap = document.querySelector(".count-wrap");
+    const stage = document.querySelector(".stage");
+    const chart = document.querySelector(".chart-plot");
+    if (wrap) ro.observe(wrap);
+    if (stage) ro.observe(stage);
+    if (chart) ro.observe(chart);
+    return ro;
+  } catch (_) { return null; }
+})();
+/* 字体/图片加载完会改变量测结果，load 时再适配一次 */
+addEventListener("load", () => { refitAndRedraw(); setTimeout(refitAndRedraw, 300); });
+
+/* 涨粉动画：数字翻滚 + 账号卡闪一下 + 「+N」徽章弹入 */
+let combo = { uid: null, total: 0, hits: 0, at: 0, timer: null };
+function clearCombo() {
+  clearTimeout(combo.timer); combo.at = 0;
+  $("growpop").classList.remove("show"); $("account").classList.remove("grow");
+}
+function playGrow(uid, delta) {
+  if (!CFG.animations || CFG.hideCount || delta <= 0) return;
+  const chained = combo.uid === uid && Date.now() - combo.at < 5000;
+  combo.total = chained ? combo.total + delta : delta;
+  combo.hits = chained ? combo.hits + 1 : 1;
+  combo.uid = uid; combo.at = Date.now(); clearTimeout(combo.timer);
+  const pop = $("growpop");
+  pop.textContent = "+" + nf(combo.total) + (combo.hits > 1 ? " · " + combo.hits + " 连击" : " · 涨粉！");
+  pop.classList.remove("show"); void pop.offsetWidth; pop.classList.add("show");
+  $("account").classList.add("grow");
+  combo.timer = setTimeout(clearCombo, 5000);
+}
+
+function renderAccount(up) {
+  up = { ...up, ...load("bili.profile." + up.uid, {}) };
+  const box = $("account");
+  if (!up.name && !up.face) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  const name = up.name || ("UID " + up.uid);
+  $("uname").textContent = name;
+  $("usign").textContent = up.sign ? up.sign.slice(0, 30) : "bilibili UP主";
+  $("uidtag").textContent = CFG.demo ? "演示 · 长按资料可编辑" : "UID " + up.uid;
+
+  const img = $("avatar");
+  const src = up.face ? up.face.replace(/^http:/, "https:") : "";
+  // 头像兜底：取不到头像时用昵称首字生成一个平面色块头像，避免开天窗
+  const fallback =
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+      '<rect width="100" height="100" fill="#fb7299"/>' +
+      '<text x="50" y="50" font-size="46" font-weight="700" fill="#fff" ' +
+      'text-anchor="middle" dominant-baseline="central" font-family="sans-serif">' +
+      escapeHTML(name.trim().charAt(0) || "B") + "</text></svg>"
+    );
+  img.onerror = () => { img.onerror = null; img.src = fallback; };
+  if (src) { if (img.dataset.src !== src) { img.dataset.src = src; img.src = src; } }
+  else { img.dataset.src = ""; img.src = fallback; }
+}
+
+/* 涨跌行（平面胶囊样式） */
+function renderDelta(uid, value) {
+  const box = $("delta");
+  const parts = [];
+  for (const [label, hours] of [["24 小时", 24], ["7 天", 168]]) {
+    const p = pointAgo(uid, hours);
+    if (!p) {
+      parts.push('<span class="pill same">' + label + " · 数据积累中</span>");
+      continue;
+    }
+    const d = value - p.v;
+    if (d === 0) {
+      parts.push('<span class="pill same">' + label + " · 持平</span>");
+      continue;
+    }
+    const cls = d > 0 ? "up" : "down";
+    const arrow = d > 0 ? "▲" : "▼";
+    parts.push(
+      '<span class="pill ' + cls + '">' + arrow + " " + label + " 涨粉 <b>" +
+      (d > 0 ? "+" : "-") + nf(Math.abs(d)) + "</b></span>"
+    );
+  }
+  const p24 = pointAgo(uid, 24);
+  if (p24) parts.push('<span class="pill same">对比 ' + sinceTxt(p24.t) + "</span>");
+  box.innerHTML = parts.join("");
+}
+
+const COLOR = { up: "#1fd39a", down: "#ff6b74", pink: "#fb7299", dim: "#9aa3b2", blue: "#3ec8f5" };
+
+function renderSpark(uid, hours) {
+  const svg = $("spark");
+  const pts = histIn(uid, hours);
+  const empty = $("chart-empty");
+  if (!CFG.showChart) { svg.innerHTML = ""; return; }
+
+  /* 只有一个点也要画：一条水平线 + 端点，让用户一眼看到当前数值在什么位置，
+     而不是空白一片（历史是靠本机逐步积累的，第一次打开必然点很少） */
+  if (!pts || !pts.length) {
+    svg.innerHTML = "";
+    empty.classList.remove("hidden");
+    $("chart-cap").textContent = "粉丝变化";
+    return;
+  }
+  empty.classList.add("hidden");
+
+  /* SVG 是 preserveAspectRatio="none"，所以 viewBox 必须正好等于它的渲染像素尺寸，
+     否则容器一变高，折线和方块点就会被纵向拉伸失真（方块变竖条、小波动变剧烈起伏）。
+     这里直接量 SVG 的真实渲染尺寸当坐标系：1 个 viewBox 单位 = 1 个 CSS 像素。 */
+  const rect = svg.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  const W = rect.width;
+  const H = rect.height;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  const pad = 10, topPad = 12;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const vs = pts.map((p) => p.v);
+  const min = Math.min(...vs), max = Math.max(...vs);
+  const span = Math.max(1, max - min);
+  const x = (t) => (t1 === t0 ? W / 2 : ((t - t0) / (t1 - t0)) * W);
+  const y = (v) => H - pad - ((v - min) / span) * (H - pad - topPad);
+
+  let d = "";
+  pts.forEach((p, i) => { d += (i ? " L " : "M ") + x(p.t).toFixed(1) + " " + y(p.v).toFixed(1); });
+  if (pts.length === 1) d += " L " + W.toFixed(1) + " " + y(pts[0].v).toFixed(1);
+
+  const area = d + " L " + W + " " + H + " L 0 " + H + " Z";
+  const lastP = pts[pts.length - 1];
+  const diff = lastP.v - pts[0].v;
+  const line = diff > 0 ? COLOR.up : diff < 0 ? COLOR.down : COLOR.dim;
+
+  // 平面风格：实色填充块 + 折线 + 末端方点（坐标系已按像素比例，不会被拉伸）
+  svg.innerHTML =
+    '<rect x="0" y="' + (H - pad).toFixed(1) + '" width="' + W + '" height="1.5" fill="' + COLOR.dim + '" fill-opacity=".45"/>' +
+    '<path d="' + area + '" fill="' + line + '" fill-opacity=".14"/>' +
+    '<path d="' + d + '" fill="none" stroke="' + line + '" stroke-width="2.5" ' +
+      'vector-effect="non-scaling-stroke" stroke-linejoin="miter" stroke-linecap="square"/>' +
+    '<rect x="' + (x(lastP.t) - 3.5).toFixed(1) + '" y="' + (y(lastP.v) - 3.5).toFixed(1) +
+      '" width="7" height="7" fill="' + line + '"/>';
+
+  const hoursTxt = hours >= 24 ? hours / 24 + " 天" : hours + " 小时";
+  const hs = histStat(uid);
+  const spanTxt = hs.n > 1 ? "已记录 " + hs.n + " 个点 · " + sinceTxt(hs.from) + "起" : "";
+  $("chart-cap").innerHTML =
+    "最近 " + hoursTxt + " · " + pts.length + " 个点 · " +
+    (pts.length === 1 ? "刚记录第 1 个点" :
+      (diff === 0 ? "无变化" : (diff > 0 ? "+" : "-") + nf(Math.abs(diff)))) +
+    (spanTxt ? '<span style="opacity:.7">　' + spanTxt + "</span>" : "");
+}
+
+/* 状态栏 */
+function setStatus(kind, text) {
+  const dot = $("dot");
+  dot.className = "dot" + (kind === "ok" ? " pulse" : kind === "warn" ? " warn" : kind === "err" ? " err" : "");
+  $("status-text").textContent = text;
+}
+
+/* ------------------------------ 主循环 ------------------------------ */
+const state = {
+  idx: 0,
+  data: new Map(),      // uid -> up
+  nextAt: 0,            // 下次刷新的时间戳
+  lastOkAt: 0,
+  startedAt: Date.now(),// 本次打开的时间（用于决定采样密疏）
+  failures: 0,
+  lastErr: "",
+  range: 1,
+  busy: false,
+  demoTimer: null
+};
+const currentUid = () => CFG.demo ? "demo" : CFG.uids[state.idx] || null;
+
+function paintFooter() {
+  const uid = currentUid();
+  const up = uid ? state.data.get(uid) : null;
+  $("foot-left").innerHTML = up
+    ? "更新于 " + clock(state.lastOkAt) + "（" + ago(state.lastOkAt) + "）"
+    : "等待首次数据…";
+  $("foot-mid").innerHTML = uid
+    ? '数据源 <b style="color:var(--text)">' + (up ? (up.source || "—") : "—") + "</b>"
+    : "未配置 UID";
+  const secs = Math.max(0, Math.round((state.nextAt - Date.now()) / 1000));
+  $("foot-right").textContent = state.failures
+    ? "第 " + state.failures + " 次失败，" + secs + " 秒后重试"
+    : (secs > 0 ? secs + " 秒后刷新" : "");
+  $("btn-retry").classList.toggle("hidden", state.failures === 0 || state.busy);
+}
+
+/* 先让数字定好大小，再按定稿后的容器尺寸重画走势图
+   （顺序很重要：数字缩放会改变图表可用高度，反过来图表又决定 viewBox 长宽比） */
+function refitAndRedraw() {
+  fitCount();
+  const uid = currentUid();
+  if (uid && state.data.get(uid)) renderSpark(uid, state.range);
+}
+
+function paintAll(animate) {
+  const uid = currentUid();
+  const up = uid ? state.data.get(uid) : null;
+  if (up) {
+    renderCount(up.follower, animate);
+    renderAccount(up);
+    renderDelta(uid, up.follower);
+    renderSpark(uid, state.range);
+    requestAnimationFrame(refitAndRedraw);
+  } else {
+    const el = $("count");
+    el.classList.add("placeholder");
+    // 注意：占位文字也要放进 .count-inner，否则会破坏内部结构
+    const inner = el.querySelector(".count-inner") || el;
+    inner.replaceChildren(document.createTextNode(CFG.uids.length ? "获取中…" : "请先设置 UID"));
+    el.dataset.v = "";
+    el.style.zoom = "";
+    el.style.transform = "";
+    $("account").classList.add("hidden");
+    $("delta").innerHTML = "";
+    $("spark").innerHTML = "";
+    $("chart-empty").classList.remove("hidden");
+  }
+  paintFooter();
+}
+
+/* 单轮取数：只取当前 UID（多账号时后台预热下一个，避免短时间大量请求） */
+async function tick(manual) {
+  if (CFG.demo) return;
+  const epoch = modeEpoch;
+  if (state.busy) return;
+  if (!CFG.uids.length) {
+    setStatus("warn", "未配置 UID");
+    paintAll(false);
+    return;
+  }
+  state.busy = true;
+  document.body.classList.add("busy");
+  setStatus("idle", "刷新中…");
+  const notes = [];
+  try {
+    const uid = currentUid();
+    const up = await fetchUp(uid, (m) => notes.push(m));
+    if (CFG.demo || epoch !== modeEpoch) return;
+    const prev = state.data.get(uid);
+    state.data.set(uid, up);
+    save("bili.last." + uid, up);   // 缓存最近一次结果，下次开机先显示它
+    pushHist(uid, up.follower);
+    state.failures = 0;
+    state.lastErr = "";
+    state.lastOkAt = Date.now();
+    const grew = prev && Number.isFinite(prev.follower) && up.follower > prev.follower;
+    setStatus("ok", grew ? "涨粉 +" + nf(up.follower - prev.follower) : "已连接");
+    paintAll(true);
+    if (grew) playGrow(uid, up.follower - prev.follower);   // ← 涨粉动画
+    scheduleNext();
+    fetchVideos(false);                                     // 视频列表：内部 30 分钟节流
+    // 后台悄悄预热其它账号
+    if (CFG.uids.length > 1 && !CFG.demo) {
+      const next = CFG.uids[(state.idx + 1) % CFG.uids.length];
+      if (!state.data.has(next)) {
+        await sleep(1200);
+        if (CFG.demo || epoch !== modeEpoch) return;
+        try {
+          const up2 = await fetchUp(next, () => {});
+          if (CFG.demo || epoch !== modeEpoch) return;
+          state.data.set(next, up2);
+          pushHist(next, up2.follower);
+        } catch (_) {}
+      }
+    }
+  } catch (e) {
+    if (CFG.demo || epoch !== modeEpoch) return;
+    state.failures++;
+    state.lastErr = e && e.message ? e.message : String(e);
+    setStatus("err", "连接失败");
+    $("btn-retry").classList.remove("hidden");
+    // 指数退避：最短 10 秒，最长 5 分钟
+    const back = clamp(Math.pow(2, Math.min(state.failures, 5)) * 5, 10, 300);
+    state.nextAt = Date.now() + back * 1000;
+    const el = $("count");
+    if (!state.data.has(currentUid())) {
+      el.classList.add("placeholder");
+      el.textContent = "连接失败";
+    }
+    $("foot-left").innerHTML = '<span class="err">' + escapeHTML(state.lastErr) + "</span>";
+    $("foot-right").textContent = back + " 秒后重试";
+    if (notes.length) console.warn("[bili]", notes.join(" | "));
+  } finally {
+    state.busy = false;
+    document.body.classList.remove("busy");
+    if (state.lastErr === "") scheduleNext();
+    paintFooter();
+  }
+}
+
+/* 下一轮时间：基础间隔 ±20% 随机抖动，避免秒级固定节奏，对风控更友好 */
+function scheduleNext() {
+  const base = clamp(Number(CFG.intervalSec) || 90, 10, 3600);
+  const jitter = base * 0.2 * (Math.random() * 2 - 1);
+  state.nextAt = Date.now() + Math.round((base + jitter) * 1000);
+  state.nextSec = Math.round((state.nextAt - Date.now()) / 1000);
+}
+
+/* 心跳：每秒走一次，负责「到点取数」和「多账号轮播」
+   单账号：每 intervalSec 秒取一次。
+   多账号：每 intervalSec 秒切到下一个账号（每个账号每 intervalSec×N 秒更新一次）；
+           当前账号还没有数据时立即取一次。 */
+setInterval(() => {
+  if (CFG.demo) return;
+  if (!CFG.uids.length) return;
+  if (state.busy) { paintFooter(); return; }
+
+  if (Date.now() >= state.nextAt) {
+    if (!state.data.has(currentUid())) {          // 新账号：立刻取数
+      tick(false);
+    } else if (CFG.uids.length > 1) {             // 已缓存：切换显示，下一次心跳取新账号
+      state.idx = (state.idx + 1) % CFG.uids.length;
+      const box = $("account");
+      box.classList.remove("paged"); void box.offsetWidth; box.classList.add("paged");
+      paintAll(false);
+      tick(false);
+    } else {
+      tick(false);
+    }
+  }
+  paintFooter();
+}, 1000);
+
+/* ------------------------------ 屏幕常亮 ------------------------------ */
+let wakeLock = null;
+let videoFallback = null;
+async function acquireWake() {
+  if (nativeScreen) { window.BiliScreen.keepScreen(!!CFG.wakeLock); return; }
+  if (!CFG.wakeLock) return releaseWake();
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+      return;
+    }
+  } catch (_) {}
+  // 老浏览器兜底：静音循环播放一个极小视频
+  if (!videoFallback) {
+    videoFallback = document.createElement("video");
+    videoFallback.setAttribute("playsinline", "");
+    videoFallback.muted = true;
+    videoFallback.loop = true;
+    videoFallback.style.cssText = "position:fixed;width:2px;height:2px;opacity:.01;pointer-events:none;left:0;bottom:0";
+    // 1×1 透明 GIF：老浏览器（主要 iOS Safari）靠循环播放媒体来阻止息屏
+    videoFallback.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    document.body.appendChild(videoFallback);
+    videoFallback.play().catch(() => {});
+  }
+}
+function releaseWake() {
+  if (nativeScreen) window.BiliScreen.keepScreen(false);
+  if (wakeLock) { try { wakeLock.release(); } catch (_) {} wakeLock = null; }
+  if (videoFallback) { try { videoFallback.pause(); } catch (_) {} }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") { acquireWake(); if (Date.now() >= state.nextAt) tick(false); }
+});
+document.addEventListener("click", () => { if (CFG.wakeLock && !wakeLock) acquireWake(); }, { passive: true });
+
+// Network recovery and Android renderer watchdog. Never replace cached values with fake data.
+addEventListener("online", () => {
+  if (!CFG.demo && (!state.lastOkAt || Date.now() - state.lastOkAt > 15000)) {
+    state.nextAt = 0;
+    tick(false);
+  }
+});
+if (nativeScreen) {
+  $("t-wake").previousElementSibling.querySelector("small").textContent = "使用安卓系统常亮；返回看板后自动恢复";
+  $("t-videos").previousElementSibling.querySelector("small").textContent = "手机直接获取最近 3 个视频的标题与播放量";
+  document.querySelector(".tips b").textContent = "常亮与后台恢复：怎么设置";
+  document.querySelector(".tips ol").innerHTML = "<li>开启本应用的「保持屏幕常亮」，把看板留在前台即可，无需先修改系统息屏时间。</li><li>额外保障：系统设置 → 显示 → 休眠 / 自动锁屏，选择最长时间或「永不」（若有）。</li><li>仅充电时常亮：先在关于手机中连续点按版本号开启开发者选项，再开启「充电时屏幕不休眠 / 保持唤醒」。不同品牌名称可能不同。</li><li>应用信息 → 电池 → 不限制，并允许自启动（若有）。按返回键可调低亮度、设置默认桌面。</li><li>锁屏、强制停止或断电后无法保证自动恢复；保持屏幕常亮仅在本应用前台生效。</li>";
+  window.BiliScreen.pulse();
+  setInterval(() => window.BiliScreen.pulse(), 15000);
+  const controls = document.createElement("button");
+  controls.textContent = "安卓常驻 / 开机恢复设置";
+  controls.className = "btn native-controls";
+  controls.onclick = () => window.BiliScreen.settings();
+  $("btn-save").parentNode.before(controls);
+}
+
+/* ------------------------------ 全屏 / 沉浸 ------------------------------ */
+async function toggleFullscreen() {
+  if (nativeScreen) { document.body.classList.toggle("immersive"); return; }
+  try {
+    if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: "hide" });
+    else await document.exitFullscreen();
+  } catch (_) {}
+}
+$("count").addEventListener("click", toggleFullscreen);
+document.body.addEventListener("click", (e) => {
+  if (e.target.closest("button,input,textarea,select,.sheet,.account")) return;
+  if (document.fullscreenElement) document.body.classList.toggle("immersive");
+});
+
+/* ------------------------------ 主题 ------------------------------ */
+/* 三态：dark（深色）/ light（浅色）/ oled（纯黑防烧屏）
+   主题按钮循环切换三态；「OLED 防烧屏」开关直接切到 / 退出 oled */
+const THEME_ORDER = ["dark", "light", "oled"];
+const THEME_META = {
+  dark:  { color: "#0b0d12", btn: "◐" },
+  light: { color: "#eef1f6", btn: "◑" },
+  oled:  { color: "#000000", btn: "◉" }
+};
+function applyTheme() {
+  const t = THEME_ORDER.includes(CFG.theme) ? CFG.theme : "dark";
+  CFG.theme = t;
+  document.documentElement.dataset.theme = t;
+  const meta = THEME_META[t];
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", meta.color);
+  $("btn-theme").textContent = meta.btn;
+  $("btn-theme").title = t === "oled" ? "纯黑主题（点击切换主题）" : "切换主题";
+  applyDim();
+  applyAppearance();
+}
+function applyAppearance() {
+  let color = /^#[0-9a-f]{6}$/i.test(CFG.accent || "") ? CFG.accent : "#fb7299";
+  let palette = null;
+  if (nativeScreen && typeof window.BiliScreen.palette === "function") {
+    try { palette = JSON.parse(window.BiliScreen.palette()); } catch (_) {}
+  }
+  if (CFG.colorMode === "monet") color = palette && palette.supported
+    ? (CFG.theme === "light" ? palette.light : palette.dark) : "#fb7299";
+  if (CFG.colorMode !== "custom" && CFG.colorMode !== "monet") color = "#fb7299";
+  const rgb = color.slice(1).match(/../g).map(s => parseInt(s, 16));
+  const linear = rgb.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
+  const luminance = linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
+  const on = luminance > .179 ? "#111111" : "#ffffff";
+  const root = document.documentElement;
+  root.style.setProperty("--accent", color);
+  root.style.setProperty("--pink", color);
+  root.style.setProperty("--pink-ink", on);
+  root.style.setProperty("--on-accent", on);
+  const ink = CFG.theme === "light" && luminance > .18 ? rgb.map(v => Math.round(v * .5))
+    : CFG.theme !== "light" && luminance < .3 ? rgb.map(v => Math.round(v * .4 + 255 * .6)) : rgb;
+  root.style.setProperty("--accent-ink", "rgb(" + ink.join(",") + ")");
+  const background = CFG.theme === "light" ? [245,245,248] : [18,21,29];
+  root.style.setProperty("--accent-soft", "rgb(" + rgb.map((v, i) => Math.round(v * .16 + background[i] * .84)).join(",") + ")");
+  $("custom-color-row").classList.toggle("hidden", CFG.colorMode !== "custom");
+  $("accent-value").textContent = color.toUpperCase();
+  $("color-hint").textContent = CFG.colorMode === "monet" && !(palette && palette.supported)
+    ? "此设备暂不支持系统莫奈配色，已回退为默认粉色。" : "按钮统一使用此强调色，文字自动匹配深浅以保持可读性。";
+  if (nativeScreen && typeof window.BiliScreen.accent === "function") window.BiliScreen.accent(color);
+}
+function applyDisplayPreferences() {
+  if (nativeScreen && typeof window.BiliScreen.display === "function")
+    window.BiliScreen.display(CFG.orientation, !!CFG.avoidCutout, Number(CFG.safeMargin) || 0);
+  else {
+    document.documentElement.style.setProperty("--extra-safe", CFG.avoidCutout ? (Number(CFG.safeMargin) || 0) + "px" : "0px");
+    applyOrientation(true);
+    refitAndRedraw();
+  }
+}
+function animateOrientation() {
+  if (!CFG.animations) return;
+  document.querySelectorAll(".stage,.sheet.open .card").forEach(element => {
+    element.classList.remove("orientation-enter");
+    void element.offsetWidth;
+    element.classList.add("orientation-enter");
+    setTimeout(() => element.classList.remove("orientation-enter"), 450);
+  });
+}
+function cycleTheme() {
+  const i = THEME_ORDER.indexOf(CFG.theme);
+  CFG.theme = THEME_ORDER[(i + 1) % THEME_ORDER.length];
+  // 进入 oled 时自动把 OLED 开关打开，退出时自动关掉，两处状态不会打架
+  if (CFG.theme !== "oled") { CFG.oled = false; CFG.dim = 0; }
+  saveCfg();
+  applyTheme();
+  syncToggles();
+  applyPixelShift(true);
+}
+
+/* ------------------------------ OLED 防烧屏 ------------------------------ */
+/* 三层防护：
+   1. 纯黑背景 + 无填充卡片（见 CSS 的 data-theme="oled"）—— 减少持续发光的面积
+   2. 内容定时整体微位移 —— 让像素点轮换工作，边缘不留常亮轮廓
+   3. 亮度整体下调（CSS filter，不动数字缩放用的 zoom/transform，两者不冲突）
+   位移刻意用「小幅随机跳变」而不是平滑滚动：平滑动画会一直让 GPU 处于活跃状态，
+   反而更费电；跳变则是一瞬间的事，视觉上几乎察觉不到。 */
+const OLED_POSITIONS = [
+  [0, 0], [7, -4], [-6, 6], [5, 8], [-8, -5],
+  [9, 0], [-3, -8], [6, 5], [-7, 3], [2, -6]
+];
+let pixelShiftTimer = null;
+let pixelShiftIdx = 0;
+const stageEl = () => document.querySelector(".stage");
+
+function applyPixelShift(force) {
+  const st = stageEl();
+  if (!st) return;
+  if (!CFG.oled) {
+    if (pixelShiftTimer) { clearInterval(pixelShiftTimer); pixelShiftTimer = null; }
+    st.style.transform = "";
+    st.style.transition = "";
+    return;
+  }
+  if (pixelShiftTimer) { clearInterval(pixelShiftTimer); pixelShiftTimer = null; }
+  if (force) pixelShiftIdx = 0;
+  const step = () => {
+    if (!CFG.oled) return;
+    // 页面在后台时不折腾
+    if (document.visibilityState !== "visible") return;
+    const [x, y] = OLED_POSITIONS[pixelShiftIdx % OLED_POSITIONS.length];
+    pixelShiftIdx++;
+    const jx = x + (Math.random() * 2 - 1) * 1.5;   // 每次再随机抖 ±1.5px，看不出规律
+    const jy = y + (Math.random() * 2 - 1) * 1.5;
+    st.style.transition = "none";
+    st.style.transform = "translate3d(" + jx.toFixed(1) + "px," + jy.toFixed(1) + "px,0)";
+  };
+  step();
+  const sec = Math.max(10, Number(CFG.pixelShiftSec) || 45);   // 频率可在配置里调
+  pixelShiftTimer = setInterval(step, sec * 1000);
+}
+
+/* 亮度下调（OLED 上降低发光强度，直接延长寿命） */
+function applyDim() {
+  const d = Math.min(0.6, Math.max(0, Number(CFG.dim) || 0));
+  document.documentElement.style.filter = "";
+  stageEl().style.filter = d > 0 ? "brightness(" + (1 - d).toFixed(2) + ")" : "";
+}
+
+/* ------------------------------ 演示模式 ------------------------------ */
+/* 假数据特意做成「只会往上涨」的阶梯，方便反复验证涨粉动画 */
+const MAX_FANS = 1000000000;
+let modeEpoch = 0;
+let demo = load("bili.demo", { count: 128456, carry: 0, elapsed: 0, rate: 0, frozen: false });
+demo.count = clamp(Math.floor(Number(demo.count) || 0), 0, MAX_FANS);
+let demoAt = Date.now();
+function dailyRate() { return Math.floor(Math.random() * (CFG.demoMax - CFG.demoMin + 1)) + CFG.demoMin; }
+function persistDemo() { save("bili.demo", demo); }
+function capNotice() {
+  showBanner("全球六分之一的人都是你的粉丝了，你太棒了~<br>已达到 10 亿上限。长按粉丝数主动调低后，才会恢复增长。");
+}
+function demoUp() {
+  return {uid:"demo", follower:demo.count, name:"演示 UP 主", face:"", sign:"本地模拟数据 · 长按粉丝数或资料编辑", source:"演示模式（非真实数据）"};
+}
+function advanceDemo() {
+  if (!CFG.demo) return;
+  const now = Date.now(), before = demo.count;
+  // Only foreground simulation time advances; reopening never invents offline followers.
+  let seconds = document.hidden ? 0 : Math.min(5, Math.max(0, (now - demoAt) / 1000)) * CFG.demoSpeed;
+  demoAt = now;
+  if (!demo.rate) demo.rate = dailyRate();
+  while (seconds > 0 && !demo.frozen) {
+    const chunk = Math.min(seconds, 86400 - demo.elapsed);
+    demo.carry += chunk * demo.rate / 86400;
+    const added = Math.floor(demo.carry); demo.carry -= added;
+    demo.count = Math.min(MAX_FANS, demo.count + added);
+    demo.elapsed += chunk; seconds -= chunk;
+    if (demo.elapsed >= 86400) { demo.elapsed = 0; demo.rate = dailyRate(); }
+    if (demo.count >= MAX_FANS) { demo.frozen = true; capNotice(); }
+  }
+  if (demo.count !== before) { persistDemo(); pushHist("demo", demo.count); }
+  state.data.set("demo", demoUp()); state.lastOkAt = now;
+  setStatus("warn", demo.frozen ? "演示 · 已到上限" : "演示模式");
+  if (demo.count !== before || !$("count").dataset.v) paintAll(true);
+  if (demo.count > before) playGrow("demo", demo.count - before);
+}
+function startDemo() {
+  stopDemo(); demoAt = Date.now(); state.failures = 0; state.nextAt = 0;
+  state.data.set("demo", demoUp()); pushHist("demo", demo.count);
+  paintAll(false); renderVideos(); advanceDemo();
+  if (demo.frozen) capNotice();
+  state.demoTimer = setInterval(advanceDemo, 1000);
+}
+function stopDemo() { clearInterval(state.demoTimer); state.demoTimer = null; clearCombo(); persistDemo(); }
+function setDemoMode(value) {
+  modeEpoch++; stopDemo(); CFG.demo = value; saveCfg(); syncToggles();
+  if (value) startDemo(); else { paintAll(false); renderVideos(); state.nextAt = 0; tick(true); }
+}
+addEventListener("pagehide", persistDemo);
+document.addEventListener("visibilitychange", () => { demoAt = Date.now(); persistDemo(); });
+
+/* ------------------------------ 最新视频 ------------------------------ */
+/* 视频列表（标题 + 播放量）只能通过服务端拿：
+   B站的 space 系列接口风控极严（实测 IP 一请求就 -412 封禁），能用的「动态」接口
+   又要求 WBI 签名。所以这条路走 server.js —— 那里做了 30 分钟缓存 + 磁盘持久化 +
+   命中限流就沿用旧数据 + 指数退避，绝不会把封禁拖长。
+   视频变化很慢，前端也做 30 分钟节流，两次请求之间不重复问。 */
+const VIDEO_REFRESH_MS = 30 * 60 * 1000;
+const videoStates = new Map();
+function videoFor(uid = currentUid()) {
+  if (!videoStates.has(uid)) videoStates.set(uid, { at: 0, loading: false, data: null, error: "" });
+  return videoStates.get(uid);
+}
+
+async function fetchVideos(force) {
+  const uid = currentUid();
+  if (CFG.demo || !uid || !CFG.showVideos) return;
+  const videoState = videoFor(uid);
+  const srv = pageServer || (CFG.server ? String(CFG.server).replace(/\/+$/, "") : "");
+  if (!srv) {
+    videoState.error = "需要本地服务";
+    renderVideos();
+    return;
+  }
+  if (!force && Date.now() - videoState.at < VIDEO_REFRESH_MS && videoState.data) return;
+  if (videoState.loading) return;
+  videoState.loading = true;
+  try {
+    const j = await fetchJSON(srv + "/api/videos?uid=" + encodeURIComponent(uid), 15000);
+    if (j && j.code === 0 && j.data) {
+      videoState.data = j.data;
+      videoState.error = "";
+      videoState.at = Date.now();
+    } else {
+      videoState.error = (j && j.message) || "接口返回异常";
+    }
+  } catch (e) {
+    videoState.error = (e && e.message) || "取视频列表失败";
+  } finally {
+    videoState.loading = false;
+    renderVideos();
+  }
+}
+
+/* 播放量：过万显示成「1.2万」，更符合 B站习惯也省宽度 */
+function fmtPlay(n) {
+  const v = Number(n) || 0;
+  if (v >= 100000000) return (v / 100000000).toFixed(1).replace(/\.0$/, "") + "亿";
+  if (v >= 10000) return (v / 10000).toFixed(1).replace(/\.0$/, "") + "万";
+  return nf(v);
+}
+const shortTime = (t) => {
+  const d = new Date(t);
+  const now = new Date();
+  const sameYear = d.getFullYear() === now.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return (sameYear ? "" : d.getFullYear() + "-") + mm + "-" + dd + " " + hh + ":" + mi;
+};
+
+function renderVideos() {
+  const videoState = videoFor();
+  const box = $("videos");
+  const list = $("vlist");
+  const meta = $("vmeta");
+  if (CFG.demo || !CFG.showVideos) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+
+  const d = videoState.data;
+  const videos = (d && d.videos) || [];
+  if (videos.length) {
+    list.innerHTML = videos.map((v) =>
+      '<div class="vitem" title="' + escapeHTML(v.title) + '">' +
+        '<span class="vt">' + escapeHTML(v.title) + "</span>" +
+        '<span class="vp" title="' + nf(v.play) + '">' + fmtPlay(v.play) + "</span>" +
+      "</div>"
+    ).join("");
+    const when = d.at ? new Date(d.at) : null;
+    const ageMin = when ? Math.round((Date.now() - when.getTime()) / 60000) : 0;
+    meta.textContent = d.stale
+      ? "数据于 " + (ageMin >= 60 ? Math.round(ageMin / 60) + " 小时" : ageMin + " 分钟") + "前获取（接口限流中）"
+      : "更新于 " + (when ? when.toLocaleTimeString("zh-CN", { hour12: false }) : "刚刚");
+    box.classList.toggle("stale", !!d.stale);
+    return;
+  }
+
+  box.classList.remove("stale");
+  meta.textContent = "";
+  const noSrv = !pageServer && !CFG.server;
+  list.innerHTML = '<div class="vempty">' +
+    (videoState.loading ? "正在读取视频列表…"
+      : noSrv ? "视频列表需要通过 node server.js 提供的接口获取（B站 space 接口风控严格，浏览器直连必被拒），并做 30 分钟缓存"
+      : "暂时取不到视频列表" + (videoState.error ? "：" + escapeHTML(videoState.error) : "")) +
+    "</div>";
+}
+
+/* ------------------------------ 连接诊断 ------------------------------ */
+/* 依次实测每种取数方式，把失败原因原样显示出来，方便定位问题 */
+async function testOne(label, fn) {
+  const t0 = Date.now();
+  try {
+    const v = await fn();
+    return { ok: true, ms: Date.now() - t0, info: v };
+  } catch (e) {
+    return { ok: false, ms: Date.now() - t0, err: (e && e.message) || String(e), name: (e && e.name) || "" };
+  }
+}
+function diagRow(label, r) {
+  const st = r.skip ? '<span class="st skip">跳过</span>'
+    : r.ok ? '<span class="st ok">通过</span>'
+    : '<span class="st fail">失败</span>';
+  const body = r.skip
+    ? r.skip
+    : r.ok
+      ? '<span class="nm">' + label + ' <span class="ms">' + r.ms + " ms</span></span>" + r.info
+      : '<span class="nm">' + label + ' <span class="ms">' + r.ms + " ms</span></span><span class=\"em\">" +
+        (r.name ? r.name + "：" : "") + r.err + "</span>";
+  return '<div class="row2">' + st + '<span class="txt">' + body + "</span></div>";
+}
+async function runDiagnostics() {
+  const box = $("diag");
+  const uid = CFG.uids && CFG.uids[0];
+  if (!uid) { box.textContent = "请先填写并保存你自己的 B站 UID。"; return; }
+  const statUrl = API_STAT(uid);
+  box.innerHTML = '<div class="row2"><span class="st skip">…</span><span class="txt">正在按顺序实测取数方式，请稍候（每项最长 10 秒）</span></div>';
+  const rows = [];
+  const push = (label, r) => { rows.push(diagRow(label, r)); box.innerHTML = rows.join(""); };
+  const t1 = (fn) => testOne("x", fn);
+
+  // 1) 同源服务
+  push("① 同源服务 /api/stat",
+    pageServer
+      ? await t1(async () => {
+          const j = await fetchJSON(pageServer + "/api/stat?uid=" + uid, 6000);
+          const s = parseStat(j);
+          return "粉丝数 " + nf(s.follower);
+        })
+      : { skip: "当前页面是 file:// 打开的本地文件，没有同源服务可用（这通常就是失败的原因）" });
+
+  // 2) JSONP 直连
+  push("② 官方接口 JSONP 直连",
+    location.protocol !== "file:"
+      ? await t1(async () => {
+          const s = parseStat(await jsonp(withJsonp(statUrl), 8000));
+          return "粉丝数 " + nf(s.follower);
+        })
+      : { skip: "file:// 页面上浏览器会拦截跨域脚本，所以这条被跳过" });
+
+  // 3) 普通 fetch 直连（预期因 CORS 失败）
+  push("③ 普通 fetch 直连（B站不给跨域头，预期失败）",
+    await t1(async () => {
+      const s = parseStat(await fetchJSON(statUrl, 8000));
+      return "粉丝数 " + nf(s.follower);
+    }));
+
+  // 4) 手填的自建代理
+  const srv = String(CFG.server || "").replace(/\/+$/, "");
+  push("④ 自建代理（设置里填的地址）",
+    srv
+      ? await t1(async () => {
+          const s = parseStat(await fetchJSON(srv + "/api/stat?uid=" + uid, 6000));
+          return "粉丝数 " + nf(s.follower);
+        })
+      : { skip: "还没填地址。电脑上跑 node server.js 后把打印出的地址填进上面输入框" });
+
+  // 5) 公共代理
+  push("⑤ 公共 CORS 代理（第三方兜底）",
+    await t1(async () => {
+      const s = parseStat(await fetchJSON(PROXIES[0](statUrl), 10000));
+      return "粉丝数 " + nf(s.follower);
+    }));
+
+  // 结果总结
+  const pass = rows.filter((h) => h.indexOf('class="st ok"') >= 0).length;
+  const sum = pass
+    ? '<div class="row2"><span class="st ok">结论</span><span class="txt">有 ' + pass +
+      " 种方式可用；页面上取数时会按 ①→②→⑤ 的顺序自动挑第一个通的。若仍显示连接失败，点「保存并刷新」后再看。</span></div>"
+    : '<div class="row2"><span class="st fail">结论</span><span class="txt">四种方式全不通：要么当前网络访问不了 B 站（试试手机流量），' +
+      "① 页面是 file:// 双击打开的，浏览器禁止本地文件联网（这最可能）；② 当前网络访问不了 B 站。" +
+      "最稳的解法：电脑上运行 " + '<b>node server.js</b>，然后用它打印的地址打开本页面（例如 http://192.168.31.205:8787）。</span></div>';
+  box.innerHTML = rows.join("") + sum;
+}
+
+/* ------------------------------ 设置面板 ------------------------------ */
+const sheet = $("sheet");
+function openSheet() {
+  $("f-uids").value = CFG.uids.join(",");
+  $("f-interval").value = CFG.intervalSec;
+  $("f-server").value = CFG.server || "";
+  syncToggles();
+  $("f-snapshot").value = JSON.stringify({
+    uids: CFG.uids.join(","),
+    intervalSec: Number(CFG.intervalSec),
+    showChart: CFG.showChart,
+    theme: CFG.theme,
+    server: CFG.server || "",
+    demo: CFG.demo,
+    wakeLock: CFG.wakeLock,
+    hideCount: CFG.hideCount,
+    oled: !!CFG.oled,
+    dim: Number(CFG.dim) || 0,
+    showVideos: !!CFG.showVideos
+    ,colorMode: CFG.colorMode, accent: CFG.accent, orientation: CFG.orientation,
+    avoidCutout: CFG.avoidCutout, safeMargin: CFG.safeMargin
+  }, null, 2);
+  sheet.classList.add("open");
+}
+function closeSheet() { sheet.classList.remove("open"); }
+function syncToggles() {
+  document.body.classList.toggle("demo-mode", !!CFG.demo);
+  document.body.classList.toggle("animations-off", !CFG.animations);
+  $("t-animations").classList.toggle("on", !!CFG.animations);
+  $("btn-save").textContent = CFG.demo ? "保存演示设置" : "保存并刷新";
+  $("f-demo-min").value = CFG.demoMin; $("f-demo-max").value = CFG.demoMax; $("f-demo-speed").value = CFG.demoSpeed;
+  $("t-chart").classList.toggle("on", !!CFG.showChart);
+  $("t-wake").classList.toggle("on", !!CFG.wakeLock);
+  $("t-theme").classList.toggle("on", CFG.theme === "oled");
+  $("t-oled").classList.toggle("on", !!CFG.oled);
+  $("t-videos").classList.toggle("on", !!CFG.showVideos);
+  $("t-hide").classList.toggle("on", !!CFG.hideCount);
+  $("t-demo").classList.toggle("on", !!CFG.demo);
+  $("t-cutout").classList.toggle("on", !!CFG.avoidCutout);
+  document.querySelectorAll(".toggle").forEach(button => {
+    button.setAttribute("role", "switch");
+    button.setAttribute("aria-checked", String(button.classList.contains("on")));
+    if (!button.hasAttribute("aria-label")) button.setAttribute("aria-label", button.previousElementSibling.childNodes[0].textContent);
+  });
+  $("f-color-mode").value = CFG.colorMode || "default";
+  $("f-accent").value = CFG.accent || "#fb7299";
+  $("f-orientation").value = CFG.orientation || "auto";
+  $("f-safe-margin").value = Number(CFG.safeMargin) || 0;
+  $("safe-margin-value").textContent = (Number(CFG.safeMargin) || 0) + " dp";
+  $("cutout-margin-field").classList.toggle("hidden", !CFG.avoidCutout);
+  document.body.classList.toggle("no-chart", !CFG.showChart);
+  document.body.classList.toggle("no-videos", CFG.demo || !CFG.showVideos);
+}
+function toggleCfg(key) {
+  CFG[key] = !CFG[key];
+  saveCfg(); syncToggles();
+}
+
+$("btn-settings").onclick = openSheet;
+$("btn-close").onclick = closeSheet;
+$("btn-test").onclick = runDiagnostics;
+sheet.addEventListener("click", (e) => { if (e.target === sheet) closeSheet(); });
+$("btn-theme").onclick = cycleTheme;
+$("btn-refresh").onclick = () => { if (CFG.demo) startDemo(); else tick(true); };
+$("btn-retry").onclick = () => tick(true);
+$("btn-demo-once").onclick = () => {
+  setDemoMode(true); closeSheet();
+};
+$("t-chart").onclick = () => { toggleCfg("showChart"); paintAll(false); };
+$("t-wake").onclick = () => { toggleCfg("wakeLock"); CFG.wakeLock ? acquireWake() : releaseWake(); };
+$("f-color-mode").onchange = () => { CFG.colorMode = $("f-color-mode").value; saveCfg(); applyAppearance(); };
+$("f-accent").oninput = () => { CFG.accent = $("f-accent").value; CFG.colorMode = "custom"; saveCfg(); applyAppearance(); };
+$("f-orientation").onchange = () => {
+  CFG.orientation = $("f-orientation").value;
+  saveCfg(); animateOrientation(); applyDisplayPreferences();
+};
+$("t-cutout").onclick = () => { toggleCfg("avoidCutout"); applyDisplayPreferences(); };
+$("f-safe-margin").oninput = () => {
+  CFG.safeMargin = Number($("f-safe-margin").value);
+  $("safe-margin-value").textContent = CFG.safeMargin + " dp";
+  saveCfg(); applyDisplayPreferences();
+};
+$("author-home").onclick = (event) => {
+  if (nativeScreen && typeof window.BiliScreen.author === "function") { event.preventDefault(); window.BiliScreen.author(); }
+};
+$("btn-guide").onclick = () => { closeSheet(); showGuide(true); };
+addEventListener("native-palette-change", applyAppearance);
+addEventListener("native-display-change", () => { animateOrientation(); onViewportChange(); });
+$("t-theme").onclick = () => {
+  CFG.theme = CFG.theme === "oled" ? "dark" : "oled";
+  if (CFG.theme !== "oled") { CFG.oled = false; CFG.dim = 0; }
+  saveCfg(); applyTheme(); syncToggles(); applyPixelShift(true);
+};
+$("t-oled").onclick = () => {
+  CFG.oled = !CFG.oled;
+  // 打开 OLED 开关 → 自动切到纯黑主题并下调亮度；关闭 → 回到深色
+  if (CFG.oled) CFG.theme = "oled";
+  CFG.dim = CFG.oled ? (Number(CFG.dim) > 0 ? Number(CFG.dim) : 0.15) : 0;
+  saveCfg();
+  applyTheme();
+  syncToggles();
+  applyPixelShift(true);
+  fitCount();            // 主题变了，颜色/边框变化不影响尺寸，但重算一次更保险
+};
+$("t-hide").onclick = () => { toggleCfg("hideCount"); paintAll(false); };
+$("t-videos").onclick = () => {
+  toggleCfg("showVideos");
+  renderVideos();
+  if (CFG.showVideos) fetchVideos(false);   // 打开时如果还没数据就取一次
+};
+$("t-demo").onclick = () => {
+  setDemoMode(!CFG.demo);
+};
+$("btn-save").onclick = () => {
+  if (CFG.demo) {
+    const min = Number($("f-demo-min").value), max = Number($("f-demo-max").value);
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max > 10000 || min > max) {
+      $("settings-error").textContent = "每天涨粉范围须为 1～10000 的整数，最小值不能大于最大值。";
+      $("settings-error").classList.remove("hidden"); return;
+    }
+    advanceDemo(); CFG.demoMin = min; CFG.demoMax = max; CFG.demoSpeed = Number($("f-demo-speed").value);
+    demo.rate = dailyRate(); demo.elapsed = 0; demoAt = Date.now(); persistDemo(); saveCfg(); closeSheet(); return;
+  }
+  const parsed = parseUids($("f-uids").value);
+  if (!parsed.length) {
+    $("settings-error").textContent = "请填写有效的 B站 UID：只包含数字，多个账号用逗号隔开。";
+    $("settings-error").classList.remove("hidden");
+    $("f-uids").focus(); return;
+  }
+  CFG.uids = parsed;
+  $("settings-error").classList.add("hidden");
+  CFG.intervalSec = clamp(Number($("f-interval").value) || 90, 10, 3600);
+  CFG.server = $("f-server").value.trim();
+  state.idx = 0;
+  state.data.clear();
+  state.failures = 0;
+  state.lastErr = "";
+  saveCfg();
+  closeSheet();
+  applyTheme(); syncToggles();
+  if (CFG.demo) startDemo(); else { state.nextAt = 0; tick(true); }
+};
+$("btn-clearhist").onclick = () => {
+  HIST = {}; save(HIST_KEY, HIST);
+  $("btn-clearhist").textContent = "已清空 ✓";
+  setTimeout(() => { $("btn-clearhist").textContent = "清空历史数据"; }, 1500);
+  paintAll(false);
+};
+$("btn-copy").onclick = async () => {
+  const t = $("f-snapshot");
+  try { await navigator.clipboard.writeText(t.value); $("btn-copy").textContent = "已复制 ✓"; }
+  catch (_) { t.select(); document.execCommand && document.execCommand("copy"); $("btn-copy").textContent = "请手动复制"; }
+  setTimeout(() => { $("btn-copy").textContent = "复制配置"; }, 1600);
+};
+document.querySelectorAll(".range button").forEach((b) => {
+  b.onclick = () => {
+    state.range = Number(b.dataset.range);
+    document.querySelectorAll(".range button").forEach((x) => x.classList.toggle("on", x === b));
+    const uid = currentUid();
+    if (uid) renderSpark(uid, state.range);
+  };
+});
+
+/* 键盘快捷键（电脑上调试用） */
+addEventListener("keydown", (e) => {
+  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (e.key === "f" || e.key === "F") toggleFullscreen();
+  if (e.key === "s" || e.key === "S") openSheet();
+  if (e.key === "r" || e.key === "R") tick(true);
+  if (e.key === "Escape") window.handleAppBack();
+});
+
+/* ------------------------------ 顶部提示条 ------------------------------ */
+function showBanner(html) {
+  $("banner-text").innerHTML = html;
+  $("banner").classList.remove("hidden");
+  document.querySelector(".stage").classList.add("has-banner");
+}
+$("banner-x").onclick = () => {
+  $("banner").classList.add("hidden");
+  document.querySelector(".stage").classList.remove("has-banner");
+};
+
+/* ------------------------------ 横竖屏自适应 ------------------------------ */
+/* 判定方式：宽高比（而非 screen.orientation），对折叠屏 / 分屏 / 旋转锁定都更可靠。
+   · 0.97 的阈值带一点迟滞，避免正方形窗口反复抖动切版
+   · 手机地址栏收起/展开会触发 resize，所以去抖 150ms，避免中间态闪烁 */
+function applyOrientation(force) {
+  const w = innerWidth, h = innerHeight;
+  const vote = !nativeScreen && CFG.orientation !== "auto" && ["portrait", "landscape"].includes(CFG.orientation)
+    ? CFG.orientation : (w > h * 0.97 ? "landscape" : "portrait");
+  const cur = document.body.dataset.ori;
+  if (!force && cur === vote) return vote;
+  document.body.dataset.ori = vote;
+  document.documentElement.dataset.ori = vote;
+  if (!force && cur && cur !== vote) animateOrientation();
+  return vote;
+}
+let oriTimer = 0;
+function onViewportChange() {
+  clearTimeout(oriTimer);
+  oriTimer = setTimeout(() => {
+    const before = document.body.dataset.ori;
+    const now = applyOrientation();
+    const uid = currentUid();
+    if (uid && state.data.get(uid)) {
+      if (before !== now) paintAll(false);
+      refitAndRedraw();                // 转屏后按新的可用空间重新适配数字 + 重画折线
+    }
+  }, 150);
+}
+addEventListener("resize", onViewportChange);
+addEventListener("orientationchange", onViewportChange);
+
+/* First run: no requests or example account until the user confirms their UID. */
+function parseUids(value) {
+  const parts = String(value || "").trim().split(/[,，\s]+/);
+  if (!parts.length || parts.some(s => !/^[1-9]\d{0,19}$/.test(s))) return [];
+  return [...new Set(parts)];
+}
+function openSystemSection(section) {
+  if (nativeScreen && typeof window.BiliScreen.systemSettings === "function") window.BiliScreen.systemSettings(section);
+}
+const helpActions = document.createElement("div");
+helpActions.className = "help-actions";
+if (nativeScreen) {
+  for (const [title, section] of [["打开系统显示设置", "display"], ["打开应用电池设置", "app"], ["打开开发者选项", "developer"]]) {
+    const button = document.createElement("button"); button.className = "btn"; button.textContent = title;
+    button.onclick = () => openSystemSection(section); helpActions.appendChild(button);
+  }
+  $("btn-guide").before(helpActions);
+}
+function showGuide(replay = false) {
+  if (document.getElementById("welcome")) return;
+  const panel = document.createElement("section");
+  panel.id = "welcome"; panel.className = "welcome";
+  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true"); panel.setAttribute("aria-label", "首次使用引导");
+  let step = 0, selectedUid = CFG.uids.join(",");
+  const render = () => {
+    panel.scrollTop = 0;
+    const content = step === 0
+      ? '<div class="welcome-mark" aria-hidden="true">B</div><h1>让闲置手机<br>成为你的粉丝屏</h1><p>大字显示粉丝变化，记录本机走势。先填写你要关注的 B站 UID，再设置常亮和屏幕方向。</p><p>无需登录 B站，无需密码。联网后仅查询公开资料，设置和历史记录保存在本机。</p>'
+      : step === 1
+        ? '<h1>你想看谁的粉丝数？</h1><p>在 B站个人空间找到 UID；网页地址末尾的数字就是 UID。</p><label for="guide-uid">B站 UID</label><input id="guide-uid" type="text" inputmode="numeric" autocomplete="off" placeholder="请填写你自己的 UID" value="' + escapeHTML(selectedUid) + '"><p>多个账号用逗号隔开。这里不会预填作者账号。</p><p id="guide-error" class="inline-error" role="alert"></p>'
+        : '<h1>准备好长期显示</h1><label class="check-row"><input type="checkbox" id="guide-wake" ' + (CFG.wakeLock ? 'checked' : '') + '>保持屏幕常亮（应用在前台时）</label><label class="check-row"><input type="checkbox" id="guide-cutout" ' + (CFG.avoidCutout ? 'checked' : '') + '>避开挖孔 / 刘海</label><ul><li>先保持默认 90 秒刷新，减少接口限流。</li><li>将应用电池策略设为「不限制」，有自启动选项时允许自启动。</li><li>无需强行设置系统「永不息屏」。更多常亮步骤、横竖屏和配色都可以在设置中调整。</li></ul>';
+    panel.innerHTML = '<div class="welcome-card"><p class="steps">首次使用 · ' + (step + 1) + ' / 3</p><div class="guide-page">' + content + '</div><div class="guide-actions">' +
+      (step > 0 ? '<button class="btn" id="guide-back">上一步</button>' : replay ? '<button class="btn" id="guide-cancel">返回看板</button>' : '<span></span>') +
+      '<button class="btn primary" id="guide-next">' + (step === 0 ? '开始设置' : step === 1 ? '下一步' : '进入粉丝屏') + '</button></div></div>';
+    if ($("guide-back")) $("guide-back").onclick = () => { if (step === 1) selectedUid = $("guide-uid").value; step--; render(); };
+    if ($("guide-cancel")) $("guide-cancel").onclick = () => panel.remove();
+    $("guide-next").onclick = () => {
+      if (step === 1) {
+        selectedUid = $("guide-uid").value.trim();
+        if (!parseUids(selectedUid).length) { $("guide-error").textContent = "请输入有效的数字 UID，多个账号用逗号隔开。"; $("guide-uid").focus(); return; }
+      }
+      if (step < 2) { step++; render(); return; }
+      CFG.uids = parseUids(selectedUid);
+      CFG.wakeLock = $("guide-wake").checked; CFG.avoidCutout = $("guide-cutout").checked;
+      CFG.demo = false; stopDemo(); state.idx = 0; state.data.clear(); state.lastOkAt = 0;
+      state.failures = 0; state.lastErr = ""; saveCfg(); save("bili.onboarded", true);
+      panel.remove(); syncToggles(); applyDisplayPreferences(); acquireWake(); applyPixelShift(true);
+      paintAll(false); tick(true); renderVideos(); fetchVideos(false);
+    };
+  };
+  document.body.appendChild(panel); render();
+}
+
+/* Local editors: never upload custom photos or profile text. */
+let editorGeneration = 0;
+function closeEditor() { editorGeneration++; $("local-editor")?.remove(); }
+function editorFrame(title, content) {
+  closeEditor();
+  const panel = document.createElement("div"); panel.id = "local-editor"; panel.className = "sheet editor open";
+  panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true"); panel.setAttribute("aria-label", title);
+  panel.innerHTML = '<div class="card"><h2>' + title + '</h2>' + content + '<p id="editor-error" class="inline-error" role="alert"></p><div class="btns"><button class="btn" id="editor-cancel">取消</button><button class="btn primary" id="editor-save">保存</button></div></div>';
+  document.body.appendChild(panel); $("editor-cancel").onclick = closeEditor;
+  panel.onclick = e => { if (e.target === panel) closeEditor(); };
+}
+function openCountEditor() {
+  if (!CFG.demo) return;
+  editorFrame("设置演示粉丝数", '<div class="field"><label for="edit-count">粉丝数 · 0～1,000,000,000</label><input id="edit-count" type="number" min="0" max="1000000000" step="1" value="' + demo.count + '"></div><p class="hint">达到上限后停止增长；主动调低数量即可恢复。</p>');
+  $("editor-save").onclick = () => {
+    const raw = $("edit-count").value.trim(), n = Number(raw);
+    if (!raw || !Number.isSafeInteger(n) || n < 0) { $("editor-error").textContent = "请输入非负整数。"; return; }
+    const before = demo.count;
+    demo.count = Math.min(MAX_FANS, n); demo.frozen = n >= MAX_FANS; demo.carry = 0; demoAt = Date.now();
+    persistDemo(); state.data.set("demo", demoUp()); pushHist("demo", demo.count); paintAll(true); closeEditor();
+    if (demo.frozen) capNotice(); else { $("banner-x").click(); if (demo.count > before) playGrow("demo", demo.count - before); }
+  };
+}
+function openProfileEditor() {
+  const uid = currentUid();
+  if (!uid) { $("settings-error").textContent = "请先保存 UID，或开启演示模式。"; $("settings-error").classList.remove("hidden"); return; }
+  const key = "bili.profile." + uid;
+  const original = CFG.demo ? demoUp() : state.data.get(uid) || load("bili.last." + uid, {name:"",face:"",sign:""});
+  const override = load(key, {}), shown = {...original,...override};
+  let face = override.face, decoding = false;
+  editorFrame("自定义显示资料", '<p class="hint">' + (CFG.demo ? '演示资料' : 'UID ' + escapeHTML(uid)) + ' · 仅保存在这台设备，不修改 B站资料。</p><img class="profile-preview" id="edit-preview" alt="头像预览"><div class="field"><label for="edit-avatar">从相册选择头像 · 自动居中裁切 1:1</label><input id="edit-avatar" type="file" accept="image/*"></div><div class="field"><label for="edit-name">昵称</label><input id="edit-name" maxlength="60"></div><div class="field"><label for="edit-sign">简介</label><textarea id="edit-sign" maxlength="300"></textarea></div><button class="btn" id="profile-reset">恢复默认资料</button>');
+  const generation = editorGeneration;
+  $("edit-name").value = shown.name || ""; $("edit-sign").value = shown.sign || "";
+  $("edit-preview").src = shown.face || $("avatar").src;
+  $("profile-reset").onclick = () => {
+    try { localStorage.removeItem(key); paintAll(false); closeEditor(); }
+    catch (_) { $("editor-error").textContent = "无法写入本地存储，请检查可用空间。"; }
+  };
+  $("edit-avatar").onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) { $("editor-error").textContent = "请选择 20 MB 以内的图片。"; return; }
+    decoding = true; $("editor-save").disabled = true; $("editor-error").textContent = "正在裁切头像…";
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, { resizeWidth: 1024, resizeQuality: "high" });
+      const size = Math.min(bitmap.width, bitmap.height);
+      const canvas = document.createElement("canvas"); canvas.width = canvas.height = 384;
+      canvas.getContext("2d").drawImage(bitmap, (bitmap.width-size)/2, (bitmap.height-size)/2, size, size, 0, 0, 384, 384);
+      const cropped = canvas.toDataURL("image/jpeg", 0.85);
+      if (generation !== editorGeneration) return;
+      face = cropped; $("edit-preview").src = face; $("editor-error").textContent = "已裁切为正方形，保存后生效。";
+    } catch (_) { if (generation === editorGeneration) $("editor-error").textContent = "无法读取图片，请尝试 JPG 或 PNG。"; }
+    finally { bitmap?.close(); decoding = false; if (generation === editorGeneration) $("editor-save").disabled = false; }
+  };
+  $("editor-save").onclick = () => {
+    if (decoding) return;
+    const profile = {name:$("edit-name").value.trim(), sign:$("edit-sign").value.trim()};
+    if (!profile.name) { $("editor-error").textContent = "请填写昵称，或使用恢复默认资料。"; return; }
+    if (face !== undefined) profile.face = face;
+    try { localStorage.setItem(key, JSON.stringify(profile)); paintAll(false); closeEditor(); }
+    catch (_) { $("editor-error").textContent = "保存失败，本机存储空间不足；原资料未改动。"; }
+  };
+}
+function longPress(element, action) {
+  let timer, x, y, fired = false;
+  const cancel = () => clearTimeout(timer);
+  element.addEventListener("pointerdown", e => {
+    if (!CFG.demo || (e.pointerType === "mouse" && e.button !== 0)) return;
+    x = e.clientX; y = e.clientY; fired = false;
+    timer = setTimeout(() => { fired = true; action(); }, 600);
+  });
+  element.addEventListener("pointermove", e => { if (Math.hypot(e.clientX-x,e.clientY-y)>10) cancel(); });
+  ["pointerup","pointercancel","pointerleave"].forEach(event => element.addEventListener(event,cancel));
+  element.addEventListener("contextmenu", e => { if (CFG.demo) e.preventDefault(); });
+  element.addEventListener("click", e => { if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; } }, true);
+}
+longPress($("count"), openCountEditor); longPress($("account"), openProfileEditor);
+$("btn-profile").onclick = openProfileEditor; $("btn-demo-count").onclick = openCountEditor;
+$("btn-demo-reset").onclick = () => {
+  editorFrame("清空演示数据？", '<p class="hint">将清除演示昵称、头像、简介和走势，粉丝数恢复为 128,456，每日涨粉恢复 1～10000、正常速度，并解除上限锁定。真实账号数据、配色和屏幕设置不会改变。</p>');
+  $("editor-save").textContent = "确认清空";
+  $("editor-save").onclick = () => {
+    stopDemo();
+    demo = {count:128456,carry:0,elapsed:0,rate:0,frozen:false};
+    delete HIST.demo; save(HIST_KEY,HIST); localStorage.removeItem("bili.profile.demo");
+    CFG.demoMin = 1; CFG.demoMax = 10000; CFG.demoSpeed = 1;
+    persistDemo(); saveCfg(); syncToggles(); closeEditor(); $("banner-x").click(); startDemo();
+  };
+};
+$("t-animations").onclick = () => { toggleCfg("animations"); clearCombo(); };
+window.handleAppBack = () => {
+  if ($("local-editor")) { closeEditor(); return true; }
+  if ($("welcome")) { if ($("guide-back")) $("guide-back").click(); else if ($("guide-cancel")) $("guide-cancel").click(); return true; }
+  if (sheet.classList.contains("open")) { closeSheet(); return true; }
+  return false;
+};
+
+/* ------------------------------ 启动 ------------------------------ */
+(function boot() {
+  applyTheme();
+  syncToggles();
+  applyOrientation(true);
+  applyDisplayPreferences();
+  acquireWake();
+
+  /* 最常见的坑：双击用 file:// 打开。浏览器会禁止本地文件联网，必然取不到数据 */
+  if (location.protocol === "file:") {
+    showBanner(
+      "<b>当前是直接打开本地文件（file://），浏览器不允许它联网，所以一定会显示「连接失败」。</b><br>" +
+      "解决办法：在电脑上执行 <code class=\"k\">node server.js</code>，然后用它打印出来的地址打开本页面（例如 " +
+      "<code class=\"k\">http://192.168.31.205:8787</code>）。<br>" +
+      "如果只是想先看排版和动画效果：点右上角 ⚙ →「演示一次」。"
+    );
+  }
+
+  if (!CFG.uids.length && !CFG.demo) {
+    setStatus("warn", "未配置 UID");
+    paintAll(false);
+    showGuide();
+    return;
+  }
+
+  // 先用上次的数据渲染一遍（含昵称头像），避免开机白屏 / 没网时只剩「获取中」
+  const uid0 = currentUid();
+  const last = uid0 ? (state.data.get(uid0) || load("bili.last." + uid0, null)) : null;
+  if (last && Number.isFinite(last.follower)) {
+    state.data.set(uid0, last);
+    paintAll(false);
+    setStatus("idle", "读取中…");
+  } else {
+    paintAll(false);
+  }
+
+  if (CFG.demo) startDemo(); else tick(true);
+  acquireWake();
+  applyPixelShift(true);     // 若开着 OLED 防烧屏，启动位移计时器
+  renderVideos();
+  fetchVideos(true);         // 启动就取一次视频列表（内部有 30 分钟节流）
+})();
+</script>
+</body>
+</html>
