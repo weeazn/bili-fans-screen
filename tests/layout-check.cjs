@@ -31,7 +31,7 @@ const { chromium } = require('playwright');
       const issues=[];
       const rect = s=>document.querySelector(s).getBoundingClientRect();
       const overlaps = (a,b)=>a.left < b.right-1 && a.right > b.left+1 && a.top < b.bottom-1 && a.bottom > b.top+1;
-      for(const [a,b] of [['.brand','#btn-refresh'],['#chip-status','#btn-refresh'],['.chartbox .cap','.range'],['.count','.delta'],['.videos','.footer']])
+      for(const [a,b] of [['.brand','#btn-refresh'],['#chip-status','#btn-refresh'],['.chartbox .cap','.range'],['.count','.delta']])
         if(getComputedStyle(document.querySelector(a)).display !== 'none')
         if(overlaps(rect(a),rect(b))) issues.push(a+' overlaps '+b);
       for(const selector of ['#btn-refresh','#btn-theme','#btn-settings','.count-inner','.range']) {
@@ -40,8 +40,6 @@ const { chromium } = require('playwright');
       if(document.documentElement.scrollWidth > innerWidth) issues.push('horizontal overflow');
       const chart=document.querySelector('.chartbox');
       if(chart.scrollHeight > chart.clientHeight+2) issues.push('chart contents clipped');
-      const videos=document.querySelector('.videos');
-      if(getComputedStyle(videos).display !== 'none' && videos.scrollHeight > videos.clientHeight+1) issues.push('video rows clipped');
       return issues;
     });
     await page.screenshot({ path:path.join(output,`${width}x${height}.png`) });

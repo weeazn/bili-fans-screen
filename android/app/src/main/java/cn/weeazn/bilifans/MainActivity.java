@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
     private android.window.OnBackInvokedCallback backCallback;
     private static final int PHOTO_REQUEST = 200;
     private FrameLayout container;
+    private MediaRestController mediaRest;
     private BiliApi api;
     private boolean visible;
     private long heartbeat;
@@ -45,6 +46,49 @@ public class MainActivity extends Activity {
     private boolean avoidCutout = true;
     private int extraSafeDp;
     private int accentColor = Color.rgb(251, 114, 153);
+    private boolean oledEnabled, oledPaused = true, windowFocused, destroyed, nativePanelOpen;
+    private float oledDim = .15f;
+    private int oledSeconds = 45, brightnessPercent = 25, shiftIndex;
+    private final Runnable oledShift = new Runnable() {
+        @Override public void run() {
+            if (!oledActive() || web == null || (mediaRest != null && mediaRest.isShowing())) return;
+            int[] offset = OledPolicy.POSITIONS[shiftIndex++ % OledPolicy.POSITIONS.length];
+            float density = getResources().getDisplayMetrics().density;
+            web.setTranslationX(Math.round(offset[0] * density));
+            web.setTranslationY(Math.round(offset[1] * density));
+            handler.postDelayed(this, oledSeconds * 1000L);
+        }
+    };
+
+    private boolean oledActive() {
+        return !destroyed && OledPolicy.active(oledEnabled, visible, windowFocused, oledPaused || nativePanelOpen);
+    }
+    private void updateOled() {
+        handler.removeCallbacks(oledShift);
+        if (destroyed) return;
+        if (web != null) { web.setTranslationX(0); web.setTranslationY(0); }
+        WindowManager.LayoutParams params = getWindow().getAttributes();
+        float brightness = OledPolicy.brightness(brightnessPercent, oledDim, oledActive(), visible);
+        if (params.screenBrightness != brightness) {
+            params.screenBrightness = brightness; getWindow().setAttributes(params);
+        }
+        if (mediaRest != null) mediaRest.environment(visible && windowFocused,
+            oledEnabled && !oledPaused && !nativePanelOpen);
+        if (oledActive() && (mediaRest == null || !mediaRest.isShowing())) handler.postDelayed(oledShift, oledSeconds * 1000L);
+    }
+    private void configureOled(boolean enabled, double dim, int seconds, boolean paused) {
+        if (destroyed) return;
+        float nextDim = OledPolicy.dim(dim);
+        int nextSeconds = OledPolicy.interval(seconds);
+        boolean changed = enabled != oledEnabled || nextDim != oledDim || nextSeconds != oledSeconds;
+        boolean pauseChanged = oledPaused != paused;
+        boolean insetChanged = enabled != oledEnabled;
+        oledEnabled = enabled; oledDim = nextDim; oledSeconds = nextSeconds; oledPaused = paused;
+        if (changed) getPreferences(0).edit().putBoolean("oledEnabled", enabled)
+            .putFloat("oledDim", oledDim).putInt("oledSeconds", oledSeconds).apply();
+        if (insetChanged) container.requestApplyInsets();
+        if (changed || pauseChanged) updateOled();
+    }
     private final ConnectivityManager.NetworkCallback networkCallback = new ConnectivityManager.NetworkCallback() {
         @Override public void onAvailable(Network network) {
             handler.postDelayed(() -> { if (visible && web != null) web.evaluateJavascript(
@@ -62,6 +106,10 @@ public class MainActivity extends Activity {
         super.onCreate(state);
         container = new FrameLayout(this);
         container.setBackgroundColor(Color.BLACK);
+        container.setClipToPadding(false); // Allow movement into the reserved margin, never beyond safe insets.
+        oledEnabled = getPreferences(0).getBoolean("oledEnabled", false);
+        oledDim = OledPolicy.dim(getPreferences(0).getFloat("oledDim", .15f));
+        oledSeconds = OledPolicy.interval(getPreferences(0).getInt("oledSeconds", 45));
         avoidCutout = getPreferences(0).getBoolean("avoidCutout", true);
         extraSafeDp = getPreferences(0).getInt("safeMargin", 0);
         if (Build.VERSION.SDK_INT >= 28) {
@@ -83,10 +131,22 @@ public class MainActivity extends Activity {
                 right = Math.max(right, cutout.getSafeInsetRight()); bottom = Math.max(bottom, cutout.getSafeInsetBottom());
             }
             int extra = avoidCutout ? Math.round(extraSafeDp * getResources().getDisplayMetrics().density) : 0;
+            // Reserve motion space inside system/cutout insets; translated pixels cannot enter the cutout.
+            if (oledEnabled) extra += (int)Math.ceil(OledPolicy.SHIFT_DP * getResources().getDisplayMetrics().density);
             view.setPadding(left + extra, top + extra, right + extra, bottom + extra);
             return insets.consumeSystemWindowInsets();
         });
-        setContentView(container);
+        FrameLayout contentRoot = new FrameLayout(this);
+        contentRoot.setBackgroundColor(Color.BLACK);
+        contentRoot.addView(container, new FrameLayout.LayoutParams(-1,-1));
+        setContentView(contentRoot);
+        mediaRest = new MediaRestController(this, contentRoot, new MediaRestController.Host() {
+            public View dashboard() { return web; }
+            public void playbackChanged() { updateOled(); }
+            public void changed() {
+                if (web != null && !destroyed) web.evaluateJavascript("window.dispatchEvent(new Event('native-media-change'))", null);
+            }
+        });
         api = new BiliApi(this);
         setKeepScreen(true);
         setBrightness(getPreferences(0).getInt("brightness", 25));
@@ -104,11 +164,14 @@ public class MainActivity extends Activity {
 
     @SuppressWarnings("SetJavaScriptEnabled")
     private void createWebView() {
+        if (mediaRest != null) mediaRest.finish(false);
+        oledPaused = true; updateOled();
         if (photoCallback != null) { photoCallback.onReceiveValue(null); photoCallback = null; }
         if (web != null) { container.removeView(web); web.destroy(); }
         heartbeat = SystemClock.elapsedRealtime();
         web = new WebView(this);
         web.setBackgroundColor(Color.BLACK);
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -169,6 +232,20 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void pulse() { handler.post(() -> heartbeat = SystemClock.elapsedRealtime()); }
         @JavascriptInterface public void keepScreen(boolean enabled) { handler.post(() -> setKeepScreen(enabled)); }
         @JavascriptInterface public void settings() { handler.post(MainActivity.this::showControls); }
+        @JavascriptInterface public void oled(boolean enabled, double dim, int seconds, boolean paused) {
+            handler.post(() -> configureOled(enabled, dim, seconds, paused));
+        }
+        @JavascriptInterface public String mediaStatus() { return mediaRest.status(); }
+        @JavascriptInterface public void mediaConfigure(boolean enabled, int seconds, int imageSeconds, boolean animate) {
+            handler.post(() -> mediaRest.configure(enabled, seconds, imageSeconds, animate));
+        }
+        @JavascriptInterface public void mediaPick() { handler.post(() -> mediaRest.pick()); }
+        @JavascriptInterface public void mediaClear() { handler.post(() -> mediaRest.clear()); }
+        @JavascriptInterface public void mediaPreview() { handler.post(() -> {
+            android.view.inputmethod.InputMethodManager ime = (android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+            if (web != null) ime.hideSoftInputFromWindow(web.getWindowToken(), 0);
+            mediaRest.preview();
+        }); }
         @JavascriptInterface public String palette() {
             if (Build.VERSION.SDK_INT < 31) return "{\"supported\":false}";
             return "{\"supported\":true,\"light\":\"" + hex(getColor(android.R.color.system_accent1_600))
@@ -215,8 +292,10 @@ public class MainActivity extends Activity {
 
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
+        updateOled();
         container.requestApplyInsets();
         if (web != null) web.evaluateJavascript("window.dispatchEvent(new Event('native-display-change'))", null);
+        if (mediaRest != null) mediaRest.resized();
     }
 
     private void setKeepScreen(boolean enabled) {
@@ -224,10 +303,9 @@ public class MainActivity extends Activity {
         else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
     private void setBrightness(int percent) {
-        WindowManager.LayoutParams params = getWindow().getAttributes();
-        params.screenBrightness = percent / 100f;
-        getWindow().setAttributes(params);
-        getPreferences(0).edit().putInt("brightness", percent).apply();
+        brightnessPercent = Math.max(1, Math.min(100, percent));
+        getPreferences(0).edit().putInt("brightness", brightnessPercent).apply();
+        updateOled();
     }
     private void immersive() {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -236,6 +314,8 @@ public class MainActivity extends Activity {
             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
     private void showControls() {
+        if (nativePanelOpen) return;
+        nativePanelOpen = true; updateOled();
         AlertDialog controlsDialog = new AlertDialog.Builder(this).setTitle("安卓专用显示设置")
             .setItems(new String[]{"设为默认桌面（重启后恢复）", "亮度 10%", "亮度 25%", "亮度 50%",
                 "系统应用设置 / 电池", "系统设置 / 恢复原桌面", "重载看板", "退出显示"}, (dialog, which) -> {
@@ -253,6 +333,11 @@ public class MainActivity extends Activity {
                 else finish();
             }).setNegativeButton("返回看板", null).create();
         controlsDialog.setOnShowListener(ignored -> {
+            if (controlsDialog.getWindow() != null) {
+                WindowManager.LayoutParams attributes = controlsDialog.getWindow().getAttributes();
+                attributes.screenBrightness = brightnessPercent / 100f;
+                controlsDialog.getWindow().setAttributes(attributes);
+            }
             android.widget.Button button = controlsDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
             button.setBackgroundTintList(ColorStateList.valueOf(accentColor));
             double luminance = 0;
@@ -264,18 +349,24 @@ public class MainActivity extends Activity {
             }
             button.setTextColor(luminance > .179 ? Color.BLACK : Color.WHITE);
         });
+        controlsDialog.setOnDismissListener(ignored -> { nativePanelOpen = false; updateOled(); });
         controlsDialog.show();
     }
 
     @Override protected void onResume() {
         super.onResume(); visible = true; heartbeat = SystemClock.elapsedRealtime();
         web.onResume(); immersive();
+        updateOled();
         web.evaluateJavascript("window.dispatchEvent(new Event('online'))", null);
         web.evaluateJavascript("window.dispatchEvent(new Event('native-palette-change'))", null);
     }
-    @Override protected void onPause() { visible = false; web.onPause(); super.onPause(); }
-    @Override public void onWindowFocusChanged(boolean focused) { super.onWindowFocusChanged(focused); if (focused) immersive(); }
+    @Override protected void onPause() { visible = false; updateOled(); web.onPause(); super.onPause(); }
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused); windowFocused = focused;
+        updateOled(); if (focused) immersive();
+    }
     private void handleBack() {
+        if (mediaRest != null && mediaRest.isShowing()) { mediaRest.finish(true); return; }
         if (web == null) return;
         web.evaluateJavascript("typeof window.handleAppBack === 'function' && window.handleAppBack()", result -> {
             if (!"true".equals(result) && !isFinishing()) showControls();
@@ -284,12 +375,15 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed() { handleBack(); }
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == MediaRestController.PICK_REQUEST) { mediaRest.result(result, data); return; }
         if (request != PHOTO_REQUEST || photoCallback == null) return;
         Uri uri = result == RESULT_OK && data != null ? data.getData() : null;
         if (uri != null && !"content".equals(uri.getScheme())) uri = null;
         photoCallback.onReceiveValue(uri == null ? null : new Uri[]{uri}); photoCallback = null;
     }
     @Override protected void onDestroy() {
+        destroyed = true;
+        if (mediaRest != null) mediaRest.destroy();
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
         if (photoCallback != null) { photoCallback.onReceiveValue(null); photoCallback = null; }

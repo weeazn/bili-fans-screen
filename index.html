@@ -313,16 +313,8 @@
   @media (max-height:460px){
     .chartbox{min-height:46px;padding-top:26px}
     .topbar{min-height:30px}
-    /* 矮屏（手机横屏）优先保证数字和图表：视频列表让位，竖屏下仍正常显示 */
-    body[data-ori="landscape"] .videos{display:none}
   }
 
-  /* 竖屏：视频列表放最下面，占一小块 */
-  body[data-ori="portrait"] .videos{width:100%}
-  /* 横屏：视频列表在左栏底部，最多 3 条，超出内部滚动 */
-  body[data-ori="landscape"] .videos{width:100%;max-height:34vh;overflow:auto}
-  body[data-ori="landscape"] .vitem{padding:6px 12px;font-size:clamp(11px,1.6vh,14px)}
-  body[data-ori="landscape"] .vcap{padding:5px 12px;font-size:10px}
 
   /* ---- 涨跌行 ---- */
   .delta{display:flex;align-items:center;gap:16px;font-size:clamp(12px,1.75vmin,17px);color:var(--dim);min-height:1.5em;flex-wrap:wrap;justify-content:center}
@@ -355,40 +347,6 @@
     border-radius:8px;padding:3px 9px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;
   }
   .range button.on{background:var(--pink);border-color:var(--pink);color:var(--pink-ink)}
-
-  /* ---- 最新视频（纯文字，平面风格） ---- */
-  .videos{
-    width:min(900px,92vw);flex:0 0 auto;
-    background:transparent;border:2px solid var(--line);border-radius:var(--r);
-    padding:0;overflow:hidden;
-  }
-  body.no-videos .videos{display:none}
-  .vcap{
-    display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:7px 14px;border-bottom:2px solid var(--line);
-    font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.06em;
-  }
-  .vcap .vmeta{font-weight:500;letter-spacing:0;opacity:.85}
-  .vlist{display:flex;flex-direction:column}
-  .vitem{
-    display:flex;align-items:center;gap:10px;
-    padding:8px 14px;border-bottom:2px solid var(--line);
-    font-size:clamp(12px,1.9vmin,15px);min-width:0;
-  }
-  .vitem:last-child{border-bottom:none}
-  .vitem .vt{
-    flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    font-weight:600;color:var(--text);
-  }
-  .vitem .vp{
-    flex:0 0 auto;font-weight:800;color:var(--pink);
-    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
-  }
-  .vitem .vp::after{content:"播放";font-size:.72em;font-weight:600;color:var(--dim);margin-left:3px;letter-spacing:.04em}
-  .vempty{padding:11px 14px;font-size:12px;color:var(--dim);font-weight:500}
-  .videos.stale .vcap{color:#f0a020}
-  :root[data-theme="oled"] .videos{border-color:var(--line)}
-  :root[data-theme="oled"] .vitem .vp{color:var(--pink)}
 
   /* ---- 底栏 ---- */
   .footer{
@@ -469,7 +427,7 @@
   .hidden{display:none !important}
 
   /* ---- 诊断 ---- */
-  .diag{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+  .diag{margin-top:12px;display:flex;flex-direction:column;gap:7px;white-space:pre-wrap;overflow-wrap:anywhere}
   .diag .row2{
     display:flex;gap:10px;align-items:flex-start;
     padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:var(--surface-2);
@@ -509,15 +467,14 @@
   #btn-refresh{grid-column:2}#btn-theme{grid-column:3}#btn-settings{grid-column:4}
   .main{min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
   body[data-ori="portrait"] .main{display:grid;grid-template-columns:minmax(0,1fr);
-    grid-template-rows:max-content max-content max-content minmax(min-content,1fr) max-content max-content;align-items:stretch;
+    grid-template-rows:max-content max-content max-content minmax(min-content,1fr) max-content;align-items:stretch;
     justify-content:normal;gap:8px;padding:8px 0 12px}
   body[data-ori="portrait"] .col-side,body[data-ori="portrait"] .col-num{display:contents}
   body[data-ori="portrait"] .account{grid-row:1;justify-self:center}
   body[data-ori="portrait"] .count-wrap{grid-row:2;width:100%;padding:12px 0 0}
   body[data-ori="portrait"] .delta{grid-row:3}
   body[data-ori="portrait"] .chartbox{grid-row:4}
-  body[data-ori="portrait"] .videos{grid-row:5}
-  body[data-ori="portrait"] .footer{grid-row:6}
+  body[data-ori="portrait"] .footer{grid-row:5}
   .banner{grid-column:1 / -1;grid-row:1}
   .account{max-width:100%;min-width:0}
   .account .who{flex:1;min-width:0}
@@ -528,7 +485,6 @@
   body[data-ori="landscape"] .col-side{justify-content:flex-start;gap:10px;overflow:auto;padding:2px}
   body[data-ori="landscape"] .col-num{padding:12px;gap:12px}
   body[data-ori="landscape"] .count-wrap{flex:1;min-height:100px}
-  body[data-ori="landscape"] .videos{display:block;max-height:none;overflow:visible}
   body[data-ori="portrait"] .chartbox,body[data-ori="landscape"] .chartbox{
     display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(44px,1fr);
     gap:8px;width:100%;height:auto;min-height:min-content;max-height:none;padding:12px;flex:1 0 150px}
@@ -541,10 +497,7 @@
   .growpop,body[data-ori="portrait"] .growpop{position:static;min-height:0;padding:0;border:0;
     background:none;color:var(--up);font-size:18px;line-height:1.4;opacity:0}
   .growpop:empty{display:none}
-  .vcap{flex-wrap:wrap;line-height:1.5;letter-spacing:0}
-  .vmeta{overflow-wrap:anywhere;min-width:0}
-  .videos{min-height:max-content}
-  .vempty,.footer>span{overflow-wrap:anywhere;min-width:0;line-height:1.6}
+  .footer>span{overflow-wrap:anywhere;min-width:0;line-height:1.6}
   .footer{gap:4px 10px;padding:4px 0}
   .sheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   .card{padding:18px 16px 24px;min-width:0}
@@ -557,7 +510,6 @@
   #btn-save{grid-column:1 / -1}
   .native-controls{display:block;width:100%;margin:16px 0 0}
   @media(max-height:460px){
-    body[data-ori="landscape"] .videos{display:none}
     body[data-ori="landscape"] .col-side{gap:6px}
     body[data-ori="landscape"] .account{padding:5px 10px 5px 5px;gap:8px}
     body[data-ori="landscape"] .account .avwrap,body[data-ori="landscape"] .account img{width:32px;height:32px}
@@ -590,7 +542,6 @@
   .welcome h1{font-size:28px;margin:0 0 10px;line-height:1.3}.welcome p{font-size:14px;line-height:1.8;color:var(--dim)}
   .welcome label{display:block;margin:18px 0 8px;font-size:14px;font-weight:700}
   .welcome .btn{width:100%;margin-top:12px}.welcome .steps{color:var(--accent-ink,var(--accent));font-size:12px}
-  .vitem .vp,:root[data-theme="oled"] .vitem .vp{color:var(--accent-ink,var(--accent))}
   .welcome li{font-size:14px;line-height:1.9;color:var(--dim);margin:8px 0}.welcome ul{padding-left:20px}
   .welcome .guide-page{animation:welcomeIn .3s ease-out}
   .welcome input{user-select:text}
@@ -631,8 +582,7 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
   "immersive": false,
   "hideCount": false,
   "oled": false,
-  "dim": 0,
-  "showVideos": true
+  "dim": 0
 }
 </script>
 
@@ -673,17 +623,6 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
         </div>
         <div class="chart-plot"><svg id="spark" viewBox="0 0 600 100" preserveAspectRatio="none"></svg></div>
         <div class="empty" id="chart-empty">正在积累数据点…（每次刷新记录一次）</div>
-      </div>
-
-      <!-- 最新 3 个视频（纯文字：标题 + 播放量） -->
-      <div class="videos" id="videos">
-        <div class="vcap">
-          <span>最新作品</span>
-          <span class="vmeta" id="vmeta"></span>
-        </div>
-        <div class="vlist" id="vlist">
-          <div class="vempty" id="vempty">正在读取视频列表…</div>
-        </div>
       </div>
 
       <footer class="footer">
@@ -740,13 +679,19 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
       <button class="toggle" id="t-theme"></button>
     </div>
     <div class="switch">
-      <span>OLED 防烧屏<small>纯黑背景 + 内容每 45 秒轻微位移 + 亮度下调，长期挂着必备</small></span>
+      <span>OLED 防烧屏<small id="oled-hint">纯黑背景、定时微位移与降亮度，只能降低烧屏风险</small></span>
       <button class="toggle" id="t-oled"></button>
     </div>
-    <div class="switch real-only">
-      <span>显示最新作品<small>最近发布 3 个视频的标题与播放量（需本地服务）</small></span>
-      <button class="toggle" id="t-videos"></button>
-    </div>
+    <section id="media-rest-settings" class="hidden">
+      <h3>防烧屏 · 媒体休息</h3>
+      <div class="switch"><span>定时播放图片 / 视频<small>需同时开启 OLED 防烧屏，仅累计前台看板显示时间</small></span><button class="toggle" id="t-media-rest" aria-label="定时播放休息媒体"></button></div>
+      <div class="field"><label for="f-media-interval">显示多久后休息（秒）</label><input id="f-media-interval" type="number" min="360" max="7200" step="1" value="600"><p class="hint">360～7200 秒，即 6 分钟～2 小时。进入设置或后台暂停计时。</p></div>
+      <div class="field"><label for="f-media-image-seconds">图片展示时长（秒）</label><input id="f-media-image-seconds" type="number" min="5" max="300" step="1" value="30"><p class="hint">默认 30 秒，可设 5～300 秒；视频静音播放一次，最长 1 分钟。</p></div>
+      <p class="hint" id="media-rest-status">尚未选择媒体</p>
+      <div class="btns"><button class="btn" id="btn-media-pick">选择图片 / 视频</button><button class="btn" id="btn-media-preview">立即预览</button><button class="btn" id="btn-media-clear">移除素材</button><button class="btn primary" id="btn-media-save">保存休息设置</button></div>
+      <p id="media-rest-error" class="inline-error" role="alert"></p>
+      <p class="hint">图片 ≤30 MB；视频 ≤200 MB 且 ≤1 分钟。素材会居中裁切铺满屏幕，建议选择与屏幕比例一致的内容。替换成功后删除应用内旧副本，相册原文件不受影响。轻触画面或按返回键结束休息。静态亮图不能代替真正黑屏休息。</p>
+    </section>
     <div class="switch">
       <span>隐藏数字<small>只显示涨跌趋势，不显示具体粉丝数</small></span>
       <button class="toggle" id="t-hide"></button>
@@ -800,7 +745,7 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
       </div>
       <div class="field">
         <label>连接诊断</label>
-        <button class="btn" id="btn-test" style="width:100%">测试四种取数方式，看到底卡在哪一步</button>
+        <button class="btn" id="btn-test" style="width:100%">检查粉丝数连接</button>
         <div class="diag" id="diag"></div>
       </div>
       <div class="field">
@@ -829,7 +774,7 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
       </ol>
       <button class="btn" id="btn-guide" style="width:100%;margin-top:12px">重新查看首次使用引导</button>
     </div>
-    <div class="author"><b>B站粉丝屏 · 1.3.1</b><br>作者：weeazn<br><a id="author-home" href="https://space.bilibili.com/67368617" rel="noopener noreferrer">访问作者 B站主页 ↗</a><br><span style="color:var(--dim)">非 B站官方应用。仅查询公开数据，无需账号密码。</span></div>
+    <div class="author"><b>B站粉丝屏 · 1.4.0</b><br>作者：weeazn<br><a id="author-home" href="https://space.bilibili.com/67368617" rel="noopener noreferrer">访问作者 B站主页 ↗</a><br><span style="color:var(--dim)">非 B站官方应用。仅查询公开数据，无需账号密码。</span></div>
   </div>
 </div>
 
@@ -876,7 +821,6 @@ const DEFAULTS = {
   hideCount: false,
   oled: false,            // OLED 防烧屏
   dim: 0,                 // 额外亮度下调比例 0~0.6
-  showVideos: true,       // 显示最新 3 个作品
   colorMode: "default",
   accent: "#fb7299",
   orientation: "auto",
@@ -1423,7 +1367,6 @@ async function tick(manual) {
     paintAll(true);
     if (grew) playGrow(uid, up.follower - prev.follower);   // ← 涨粉动画
     scheduleNext();
-    fetchVideos(false);                                     // 视频列表：内部 30 分钟节流
     // 后台悄悄预热其它账号
     if (CFG.uids.length > 1 && !CFG.demo) {
       const next = CFG.uids[(state.idx + 1) % CFG.uids.length];
@@ -1541,7 +1484,6 @@ addEventListener("online", () => {
 });
 if (nativeScreen) {
   $("t-wake").previousElementSibling.querySelector("small").textContent = "使用安卓系统常亮；返回看板后自动恢复";
-  $("t-videos").previousElementSibling.querySelector("small").textContent = "手机直接获取最近 3 个视频的标题与播放量";
   document.querySelector(".tips b").textContent = "常亮与后台恢复：怎么设置";
   document.querySelector(".tips ol").innerHTML = "<li>开启本应用的「保持屏幕常亮」，把看板留在前台即可，无需先修改系统息屏时间。</li><li>额外保障：系统设置 → 显示 → 休眠 / 自动锁屏，选择最长时间或「永不」（若有）。</li><li>仅充电时常亮：先在关于手机中连续点按版本号开启开发者选项，再开启「充电时屏幕不休眠 / 保持唤醒」。不同品牌名称可能不同。</li><li>应用信息 → 电池 → 不限制，并允许自启动（若有）。按返回键可调低亮度、设置默认桌面。</li><li>锁屏、强制停止或断电后无法保证自动恢复；保持屏幕常亮仅在本应用前台生效。</li>";
   window.BiliScreen.pulse();
@@ -1646,7 +1588,7 @@ function cycleTheme() {
 }
 
 /* ------------------------------ OLED 防烧屏 ------------------------------ */
-/* 三层防护：
+/* 安卓支持 oled 桥接时，由原生负责窗口亮度和定时位移；以下 CSS 实现仅用于兼容回退。三层防护：
    1. 纯黑背景 + 无填充卡片（见 CSS 的 data-theme="oled"）—— 减少持续发光的面积
    2. 内容定时整体微位移 —— 让像素点轮换工作，边缘不留常亮轮廓
    3. 亮度整体下调（CSS filter，不动数字缩放用的 zoom/transform，两者不冲突）
@@ -1660,9 +1602,24 @@ let pixelShiftTimer = null;
 let pixelShiftIdx = 0;
 const stageEl = () => document.querySelector(".stage");
 
+function nativeOledAvailable() {
+  return nativeScreen && typeof window.BiliScreen.oled === "function";
+}
+function syncNativeOled() {
+  if (!nativeOledAvailable()) return;
+  const paused = document.hidden || $("sheet").classList.contains("open") || !!$("local-editor") || !!$("welcome");
+  window.BiliScreen.oled(!!CFG.oled, Math.min(.6, Math.max(0, Number(CFG.dim) || 0)),
+    Math.min(3600, Math.max(10, Number(CFG.pixelShiftSec) || 45)), paused);
+}
+
 function applyPixelShift(force) {
   const st = stageEl();
   if (!st) return;
+  if (nativeOledAvailable()) {
+    clearInterval(pixelShiftTimer); pixelShiftTimer = null;
+    st.style.transform = ""; st.style.transition = ""; st.style.filter = "";
+    syncNativeOled(); return;
+  }
   if (!CFG.oled) {
     if (pixelShiftTimer) { clearInterval(pixelShiftTimer); pixelShiftTimer = null; }
     st.style.transform = "";
@@ -1687,10 +1644,11 @@ function applyPixelShift(force) {
   pixelShiftTimer = setInterval(step, sec * 1000);
 }
 
-/* 亮度下调（OLED 上降低发光强度，直接延长寿命） */
+/* 原生窗口亮度优先；网页版使用视觉亮度滤镜。 */
 function applyDim() {
   const d = Math.min(0.6, Math.max(0, Number(CFG.dim) || 0));
   document.documentElement.style.filter = "";
+  if (nativeOledAvailable()) { stageEl().style.filter = ""; syncNativeOled(); return; }
   stageEl().style.filter = d > 0 ? "brightness(" + (1 - d).toFixed(2) + ")" : "";
 }
 
@@ -1734,114 +1692,17 @@ function advanceDemo() {
 function startDemo() {
   stopDemo(); demoAt = Date.now(); state.failures = 0; state.nextAt = 0;
   state.data.set("demo", demoUp()); pushHist("demo", demo.count);
-  paintAll(false); renderVideos(); advanceDemo();
+  paintAll(false); advanceDemo();
   if (demo.frozen) capNotice();
   state.demoTimer = setInterval(advanceDemo, 1000);
 }
 function stopDemo() { clearInterval(state.demoTimer); state.demoTimer = null; clearCombo(); persistDemo(); }
 function setDemoMode(value) {
   modeEpoch++; stopDemo(); CFG.demo = value; saveCfg(); syncToggles();
-  if (value) startDemo(); else { paintAll(false); renderVideos(); state.nextAt = 0; tick(true); }
+  if (value) startDemo(); else { paintAll(false); state.nextAt = 0; tick(true); }
 }
 addEventListener("pagehide", persistDemo);
 document.addEventListener("visibilitychange", () => { demoAt = Date.now(); persistDemo(); });
-
-/* ------------------------------ 最新视频 ------------------------------ */
-/* 视频列表（标题 + 播放量）只能通过服务端拿：
-   B站的 space 系列接口风控极严（实测 IP 一请求就 -412 封禁），能用的「动态」接口
-   又要求 WBI 签名。所以这条路走 server.js —— 那里做了 30 分钟缓存 + 磁盘持久化 +
-   命中限流就沿用旧数据 + 指数退避，绝不会把封禁拖长。
-   视频变化很慢，前端也做 30 分钟节流，两次请求之间不重复问。 */
-const VIDEO_REFRESH_MS = 30 * 60 * 1000;
-const videoStates = new Map();
-function videoFor(uid = currentUid()) {
-  if (!videoStates.has(uid)) videoStates.set(uid, { at: 0, loading: false, data: null, error: "" });
-  return videoStates.get(uid);
-}
-
-async function fetchVideos(force) {
-  const uid = currentUid();
-  if (CFG.demo || !uid || !CFG.showVideos) return;
-  const videoState = videoFor(uid);
-  const srv = pageServer || (CFG.server ? String(CFG.server).replace(/\/+$/, "") : "");
-  if (!srv) {
-    videoState.error = "需要本地服务";
-    renderVideos();
-    return;
-  }
-  if (!force && Date.now() - videoState.at < VIDEO_REFRESH_MS && videoState.data) return;
-  if (videoState.loading) return;
-  videoState.loading = true;
-  try {
-    const j = await fetchJSON(srv + "/api/videos?uid=" + encodeURIComponent(uid), 15000);
-    if (j && j.code === 0 && j.data) {
-      videoState.data = j.data;
-      videoState.error = "";
-      videoState.at = Date.now();
-    } else {
-      videoState.error = (j && j.message) || "接口返回异常";
-    }
-  } catch (e) {
-    videoState.error = (e && e.message) || "取视频列表失败";
-  } finally {
-    videoState.loading = false;
-    renderVideos();
-  }
-}
-
-/* 播放量：过万显示成「1.2万」，更符合 B站习惯也省宽度 */
-function fmtPlay(n) {
-  const v = Number(n) || 0;
-  if (v >= 100000000) return (v / 100000000).toFixed(1).replace(/\.0$/, "") + "亿";
-  if (v >= 10000) return (v / 10000).toFixed(1).replace(/\.0$/, "") + "万";
-  return nf(v);
-}
-const shortTime = (t) => {
-  const d = new Date(t);
-  const now = new Date();
-  const sameYear = d.getFullYear() === now.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return (sameYear ? "" : d.getFullYear() + "-") + mm + "-" + dd + " " + hh + ":" + mi;
-};
-
-function renderVideos() {
-  const videoState = videoFor();
-  const box = $("videos");
-  const list = $("vlist");
-  const meta = $("vmeta");
-  if (CFG.demo || !CFG.showVideos) { box.classList.add("hidden"); return; }
-  box.classList.remove("hidden");
-
-  const d = videoState.data;
-  const videos = (d && d.videos) || [];
-  if (videos.length) {
-    list.innerHTML = videos.map((v) =>
-      '<div class="vitem" title="' + escapeHTML(v.title) + '">' +
-        '<span class="vt">' + escapeHTML(v.title) + "</span>" +
-        '<span class="vp" title="' + nf(v.play) + '">' + fmtPlay(v.play) + "</span>" +
-      "</div>"
-    ).join("");
-    const when = d.at ? new Date(d.at) : null;
-    const ageMin = when ? Math.round((Date.now() - when.getTime()) / 60000) : 0;
-    meta.textContent = d.stale
-      ? "数据于 " + (ageMin >= 60 ? Math.round(ageMin / 60) + " 小时" : ageMin + " 分钟") + "前获取（接口限流中）"
-      : "更新于 " + (when ? when.toLocaleTimeString("zh-CN", { hour12: false }) : "刚刚");
-    box.classList.toggle("stale", !!d.stale);
-    return;
-  }
-
-  box.classList.remove("stale");
-  meta.textContent = "";
-  const noSrv = !pageServer && !CFG.server;
-  list.innerHTML = '<div class="vempty">' +
-    (videoState.loading ? "正在读取视频列表…"
-      : noSrv ? "视频列表需要通过 node server.js 提供的接口获取（B站 space 接口风控严格，浏览器直连必被拒），并做 30 分钟缓存"
-      : "暂时取不到视频列表" + (videoState.error ? "：" + escapeHTML(videoState.error) : "")) +
-    "</div>";
-}
 
 /* ------------------------------ 连接诊断 ------------------------------ */
 /* 依次实测每种取数方式，把失败原因原样显示出来，方便定位问题 */
@@ -1870,6 +1731,20 @@ async function runDiagnostics() {
   const box = $("diag");
   const uid = CFG.uids && CFG.uids[0];
   if (!uid) { box.textContent = "请先填写并保存你自己的 B站 UID。"; return; }
+  if (nativeScreen) {
+    box.textContent = "正在检查安卓粉丝数接口…";
+    const rows = [];
+    for (const [name, path] of [["粉丝数", "stat"]]) {
+      try {
+        const j = await fetchJSON(pageServer + "/api/" + path + "?uid=" + encodeURIComponent(uid), 25000);
+        const detail = j.code !== 0 ? j.message || "接口异常" : "连接正常";
+        const retry = j.retryAt || j.data?.retryAt;
+        rows.push(name + "：" + detail + (retry ? "；下次尝试 " + new Date(retry).toLocaleTimeString("zh-CN", {hour12:false}) : ""));
+      } catch (e) { rows.push(name + "：" + e.message); }
+      box.textContent = rows.join("\n");
+    }
+    return;
+  }
   const statUrl = API_STAT(uid);
   box.innerHTML = '<div class="row2"><span class="st skip">…</span><span class="txt">正在按顺序实测取数方式，请稍候（每项最长 10 秒）</span></div>';
   const rows = [];
@@ -1933,6 +1808,7 @@ async function runDiagnostics() {
 /* ------------------------------ 设置面板 ------------------------------ */
 const sheet = $("sheet");
 function openSheet() {
+  refreshMediaRest(true);
   $("f-uids").value = CFG.uids.join(",");
   $("f-interval").value = CFG.intervalSec;
   $("f-server").value = CFG.server || "";
@@ -1948,8 +1824,7 @@ function openSheet() {
     hideCount: CFG.hideCount,
     oled: !!CFG.oled,
     dim: Number(CFG.dim) || 0,
-    showVideos: !!CFG.showVideos
-    ,colorMode: CFG.colorMode, accent: CFG.accent, orientation: CFG.orientation,
+    colorMode: CFG.colorMode, accent: CFG.accent, orientation: CFG.orientation,
     avoidCutout: CFG.avoidCutout, safeMargin: CFG.safeMargin
   }, null, 2);
   sheet.classList.add("open");
@@ -1965,7 +1840,6 @@ function syncToggles() {
   $("t-wake").classList.toggle("on", !!CFG.wakeLock);
   $("t-theme").classList.toggle("on", CFG.theme === "oled");
   $("t-oled").classList.toggle("on", !!CFG.oled);
-  $("t-videos").classList.toggle("on", !!CFG.showVideos);
   $("t-hide").classList.toggle("on", !!CFG.hideCount);
   $("t-demo").classList.toggle("on", !!CFG.demo);
   $("t-cutout").classList.toggle("on", !!CFG.avoidCutout);
@@ -1981,7 +1855,6 @@ function syncToggles() {
   $("safe-margin-value").textContent = (Number(CFG.safeMargin) || 0) + " dp";
   $("cutout-margin-field").classList.toggle("hidden", !CFG.avoidCutout);
   document.body.classList.toggle("no-chart", !CFG.showChart);
-  document.body.classList.toggle("no-videos", CFG.demo || !CFG.showVideos);
 }
 function toggleCfg(key) {
   CFG[key] = !CFG[key];
@@ -2035,11 +1908,6 @@ $("t-oled").onclick = () => {
   fitCount();            // 主题变了，颜色/边框变化不影响尺寸，但重算一次更保险
 };
 $("t-hide").onclick = () => { toggleCfg("hideCount"); paintAll(false); };
-$("t-videos").onclick = () => {
-  toggleCfg("showVideos");
-  renderVideos();
-  if (CFG.showVideos) fetchVideos(false);   // 打开时如果还没数据就取一次
-};
 $("t-demo").onclick = () => {
   setDemoMode(!CFG.demo);
 };
@@ -2191,7 +2059,7 @@ function showGuide(replay = false) {
       CFG.demo = false; stopDemo(); state.idx = 0; state.data.clear(); state.lastOkAt = 0;
       state.failures = 0; state.lastErr = ""; saveCfg(); save("bili.onboarded", true);
       panel.remove(); syncToggles(); applyDisplayPreferences(); acquireWake(); applyPixelShift(true);
-      paintAll(false); tick(true); renderVideos(); fetchVideos(false);
+      paintAll(false); tick(true);
     };
   };
   document.body.appendChild(panel); render();
@@ -2286,13 +2154,63 @@ $("btn-demo-reset").onclick = () => {
     persistDemo(); saveCfg(); syncToggles(); closeEditor(); $("banner-x").click(); startDemo();
   };
 };
-$("t-animations").onclick = () => { toggleCfg("animations"); clearCombo(); };
+$("t-animations").onclick = () => { toggleCfg("animations"); clearCombo(); syncMediaAnimation(); };
 window.handleAppBack = () => {
   if ($("local-editor")) { closeEditor(); return true; }
   if ($("welcome")) { if ($("guide-back")) $("guide-back").click(); else if ($("guide-cancel")) $("guide-cancel").click(); return true; }
   if (sheet.classList.contains("open")) { closeSheet(); return true; }
   return false;
 };
+
+let mediaRestState = {};
+function mediaRestAvailable() { return nativeScreen && typeof window.BiliScreen.mediaStatus === "function"; }
+function refreshMediaRest(fillFields = false) {
+  if (!mediaRestAvailable()) return;
+  try { mediaRestState = JSON.parse(window.BiliScreen.mediaStatus()); } catch (_) { return; }
+  $("media-rest-settings").classList.remove("hidden");
+  const info = mediaRestState;
+  $("t-media-rest").classList.toggle("on", !!info.enabled);
+  $("t-media-rest").setAttribute("role", "switch");
+  $("t-media-rest").setAttribute("aria-checked", String(!!info.enabled));
+  if (fillFields) { $("f-media-interval").value = info.interval || 600; $("f-media-image-seconds").value = info.imageSeconds || 30; }
+  $("media-rest-status").textContent = info.importing ? "正在复制并检查素材，请稍候…" : info.hasMedia
+    ? (info.kind === "video" ? "视频 · " + Math.round(info.duration / 1000) + " 秒" : "图片") + " · " + (Number(info.bytes) / 1048576).toFixed(1) + " MB" + (info.enabled ? (CFG.oled ? " · 已启用" : " · 等待开启 OLED 防烧屏") : " · 未启用")
+    : "尚未选择媒体；选好后开启上方开关。";
+  $("btn-media-pick").disabled = !!info.importing;
+  $("btn-media-preview").disabled = !info.hasMedia || !!info.importing;
+  $("btn-media-clear").disabled = !info.hasMedia || !!info.importing;
+}
+function saveMediaRest(enabled = !!mediaRestState.enabled) {
+  const seconds = Number($("f-media-interval").value), imageSeconds = Number($("f-media-image-seconds").value);
+  if (!Number.isInteger(seconds) || seconds < 360 || seconds > 7200 || !Number.isInteger(imageSeconds) || imageSeconds < 5 || imageSeconds > 300) {
+    $("media-rest-error").textContent = "显示间隔须为 360～7200 秒，图片时长须为 5～300 秒，均为整数。"; return;
+  }
+  window.BiliScreen.mediaConfigure(enabled, seconds, imageSeconds, !!CFG.animations);
+  mediaRestState.enabled = enabled; $("media-rest-error").textContent = "休息设置已保存。";
+}
+function syncMediaAnimation() {
+  if (!mediaRestAvailable()) return;
+  const info = JSON.parse(window.BiliScreen.mediaStatus());
+  window.BiliScreen.mediaConfigure(!!info.enabled, info.interval || 600, info.imageSeconds || 30, !!CFG.animations);
+}
+if (mediaRestAvailable()) {
+  refreshMediaRest(true); syncMediaAnimation();
+  $("t-media-rest").onclick = () => saveMediaRest(!mediaRestState.enabled);
+  $("btn-media-save").onclick = () => saveMediaRest();
+  $("btn-media-pick").onclick = () => window.BiliScreen.mediaPick();
+  $("btn-media-preview").onclick = () => window.BiliScreen.mediaPreview();
+  $("btn-media-clear").onclick = () => window.BiliScreen.mediaClear();
+  addEventListener("native-media-change", () => refreshMediaRest(false));
+}
+
+// Only observe panel visibility, not chart/digit updates: no per-frame bridge traffic.
+if (nativeOledAvailable()) {
+  $("oled-hint").textContent = "安卓原生降亮度与微位移；打开设置或切到后台时暂停。纯黑不需要特殊权限，防护不能完全避免烧屏。";
+  const oledObserver = new MutationObserver(syncNativeOled);
+  oledObserver.observe($("sheet"), {attributes:true, attributeFilter:["class"]});
+  oledObserver.observe(document.body, {childList:true});
+  document.addEventListener("visibilitychange", syncNativeOled);
+}
 
 /* ------------------------------ 启动 ------------------------------ */
 (function boot() {
@@ -2333,9 +2251,7 @@ window.handleAppBack = () => {
   if (CFG.demo) startDemo(); else tick(true);
   acquireWake();
   applyPixelShift(true);     // 若开着 OLED 防烧屏，启动位移计时器
-  renderVideos();
-  fetchVideos(true);         // 启动就取一次视频列表（内部有 30 分钟节流）
-})();
+  })();
 </script>
 </body>
 </html>

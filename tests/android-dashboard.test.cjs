@@ -54,10 +54,3 @@ test('Android screen switch is forwarded to the operating system', async () => {
   await ctx.acquireWake();
   assert.deepEqual(calls, [true, false]);
 });
-test('Video caches remain separate per UID', () => {
-  const ctx = vm.createContext({ videoStates: new Map(), currentUid: () => '1' });
-  vm.runInContext(fn('videoFor'), ctx);
-  ctx.videoFor('1').data = { videos: ['first account'] };
-  assert.equal(ctx.videoFor('2').data, null);
-  assert.equal(ctx.videoFor('1').data.videos[0], 'first account');
-});
