@@ -239,6 +239,8 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void mediaConfigure(boolean enabled, int seconds, int imageSeconds, boolean animate) {
             handler.post(() -> mediaRest.configure(enabled, seconds, imageSeconds, animate));
         }
+        @JavascriptInterface public void mediaGallery() { handler.post(() -> mediaRest.gallery()); }
+        @JavascriptInterface public void mediaMode(String value) { handler.post(() -> mediaRest.mode(value)); }
         @JavascriptInterface public void mediaPick() { handler.post(() -> mediaRest.pick()); }
         @JavascriptInterface public void mediaClear() { handler.post(() -> mediaRest.clear()); }
         @JavascriptInterface public void mediaPreview() { handler.post(() -> {

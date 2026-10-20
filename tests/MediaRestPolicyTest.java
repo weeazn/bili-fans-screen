@@ -5,7 +5,12 @@ public class MediaRestPolicyTest {
     static void rejected(boolean video,long bytes,long duration){try{MediaRestPolicy.validate(video,bytes,duration);throw new AssertionError("must reject");}catch(IllegalArgumentException expected){}}
     public static void main(String[] args){
         check(MediaRestPolicy.interval(359)==360,"minimum display");check(MediaRestPolicy.interval(7201)==7200,"maximum display");
-        MediaRestPolicy.validate(false,30L*1024*1024,0);rejected(false,30L*1024*1024+1,0);
+        if(!MediaRestPolicy.fitImage(1080,1920,1920,1080))throw new AssertionError("portrait in landscape");
+        if(MediaRestPolicy.fitImage(1920,1080,1920,1080))throw new AssertionError("landscape cover");
+        MediaRestPolicy.validateCount(10,false);
+        try{MediaRestPolicy.validateCount(11,false);throw new AssertionError("11 accepted");}catch(IllegalArgumentException expected){}
+        try{MediaRestPolicy.validateCount(2,true);throw new AssertionError("2 videos accepted");}catch(IllegalArgumentException expected){}
+        MediaRestPolicy.validate(false,20L*1024*1024,0);rejected(false,20L*1024*1024+1,0);
         MediaRestPolicy.validate(true,200L*1024*1024,60000);rejected(true,200L*1024*1024+1,60000);rejected(true,100,60001);rejected(true,100,0);
         MediaRestPolicy.Clock clock=new MediaRestPolicy.Clock();clock.running(true,0);
         check(clock.remaining(360,359999)==1,"not early");check(clock.remaining(360,360000)==0,"due");

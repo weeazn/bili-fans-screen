@@ -1,13 +1,15 @@
 package cn.weeazn.bilifans;
 
 final class MediaRestPolicy {
-    static final long IMAGE_LIMIT = 30L * 1024 * 1024;
+    static final long IMAGE_LIMIT = 20L * 1024 * 1024;
     static final long VIDEO_LIMIT = 200L * 1024 * 1024;
+    static boolean fitImage(int w,int h,int viewW,int viewH) { return (w>h && viewW<viewH)||(w<h && viewW>viewH); }
+    static void validateCount(int count,boolean video) { if(count<1 || count>(video?1:10))throw new IllegalArgumentException(video?"视频只能选择一个":"图片最多 10 张"); }
     static int interval(int seconds) { return Math.max(360, Math.min(7200, seconds)); }
     static int imageSeconds(int seconds) { return Math.max(5, Math.min(300, seconds)); }
     static void validate(boolean video, long bytes, long duration) {
         if (bytes <= 0 || bytes > (video ? VIDEO_LIMIT : IMAGE_LIMIT))
-            throw new IllegalArgumentException(video ? "视频不能超过 200 MB" : "图片不能超过 30 MB");
+            throw new IllegalArgumentException(video ? "视频不能超过 200 MB" : "图片不能超过 20 MB");
         if (video && (duration <= 0 || duration > 60000))
             throw new IllegalArgumentException("视频时长须大于 0 且不超过 1 分钟");
     }

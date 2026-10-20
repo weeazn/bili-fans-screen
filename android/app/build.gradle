@@ -13,8 +13,8 @@ android {
         applicationId 'cn.weeazn.bilifans'
         minSdk 23
         targetSdk 35
-        versionCode 8
-        versionName '1.4.0'
+        versionCode 10
+        versionName '1.4.2'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

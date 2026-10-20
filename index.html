@@ -565,6 +565,20 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
 .profile-preview { width:96px;height:96px;object-fit:cover;border-radius:24px;background:var(--accent-soft); }
 #account,#count { touch-action:pan-y; -webkit-user-select:none; user-select:none; }
 .growpop { max-width:100%; font-size:clamp(12px,3vw,22px); overflow-wrap:anywhere; color:var(--accent);font-weight:900; }
+
+/* Large OLED layout rotations preserve normal document flow and safe insets. */
+body[data-oled-layout="1"] .stage,body[data-oled-layout="3"] .stage{grid-template-rows:minmax(0,1fr) auto}
+body[data-oled-layout="1"] .topbar,body[data-oled-layout="3"] .topbar{grid-row:2}
+body[data-oled-layout="1"] .main,body[data-oled-layout="3"] .main{grid-row:1}
+body[data-ori="landscape"][data-oled-layout="1"] .col-num,body[data-ori="landscape"][data-oled-layout="2"] .col-num{grid-column:1;order:1}
+body[data-ori="landscape"][data-oled-layout="1"] .col-side,body[data-ori="landscape"][data-oled-layout="2"] .col-side{grid-column:2;order:2}
+body[data-ori="portrait"][data-oled-layout="1"] .main,body[data-ori="portrait"][data-oled-layout="2"] .main{grid-template-rows:minmax(min-content,1fr) max-content max-content max-content max-content}
+body[data-ori="portrait"][data-oled-layout="1"] .chartbox,body[data-ori="portrait"][data-oled-layout="2"] .chartbox{grid-row:1}
+body[data-ori="portrait"][data-oled-layout="1"] .footer,body[data-ori="portrait"][data-oled-layout="2"] .footer{grid-row:2}
+body[data-ori="portrait"][data-oled-layout="1"] .count-wrap,body[data-ori="portrait"][data-oled-layout="2"] .count-wrap{grid-row:3}
+body[data-ori="portrait"][data-oled-layout="1"] .delta,body[data-ori="portrait"][data-oled-layout="2"] .delta{grid-row:4}
+body[data-ori="portrait"][data-oled-layout="1"] .account,body[data-ori="portrait"][data-oled-layout="2"] .account{grid-row:5}
+
 </style>
 </head>
 <body>
@@ -679,18 +693,18 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
       <button class="toggle" id="t-theme"></button>
     </div>
     <div class="switch">
-      <span>OLED 防烧屏<small id="oled-hint">纯黑背景、定时微位移与降亮度，只能降低烧屏风险</small></span>
+      <span>OLED 防烧屏<small id="oled-hint">每 60 秒轮换数字、图表和顶栏位置，配合纯黑与降亮度</small></span>
       <button class="toggle" id="t-oled"></button>
     </div>
     <section id="media-rest-settings" class="hidden">
       <h3>防烧屏 · 媒体休息</h3>
       <div class="switch"><span>定时播放图片 / 视频<small>需同时开启 OLED 防烧屏，仅累计前台看板显示时间</small></span><button class="toggle" id="t-media-rest" aria-label="定时播放休息媒体"></button></div>
       <div class="field"><label for="f-media-interval">显示多久后休息（秒）</label><input id="f-media-interval" type="number" min="360" max="7200" step="1" value="600"><p class="hint">360～7200 秒，即 6 分钟～2 小时。进入设置或后台暂停计时。</p></div>
-      <div class="field"><label for="f-media-image-seconds">图片展示时长（秒）</label><input id="f-media-image-seconds" type="number" min="5" max="300" step="1" value="30"><p class="hint">默认 30 秒，可设 5～300 秒；视频静音播放一次，最长 1 分钟。</p></div>
-      <p class="hint" id="media-rest-status">尚未选择媒体</p>
+      <div class="field"><label for="f-media-image-seconds">每张图片展示时长（秒）</label><input id="f-media-image-seconds" type="number" min="5" max="300" step="1" value="30"><p class="hint">默认 30 秒，可设 5～300 秒；视频静音播放一次，最长 1 分钟。</p></div>
+      <div class="field"><label for="f-media-mode">图片播放顺序</label><select id="f-media-mode"><option value="sequence">顺序轮播</option><option value="random">随机播放（每轮不重复）</option></select><p class="hint">每次休息播放整组图片一遍。最多 10 张，每张不超过 20 MB；与视频二选一。横屏遇到竖图时完整显示并保留黑边，同方向图片裁切铺满。</p></div><button class="btn" id="btn-media-gallery">查看已导入图片</button><p class="hint" id="media-rest-status">尚未选择媒体</p>
       <div class="btns"><button class="btn" id="btn-media-pick">选择图片 / 视频</button><button class="btn" id="btn-media-preview">立即预览</button><button class="btn" id="btn-media-clear">移除素材</button><button class="btn primary" id="btn-media-save">保存休息设置</button></div>
       <p id="media-rest-error" class="inline-error" role="alert"></p>
-      <p class="hint">图片 ≤30 MB；视频 ≤200 MB 且 ≤1 分钟。素材会居中裁切铺满屏幕，建议选择与屏幕比例一致的内容。替换成功后删除应用内旧副本，相册原文件不受影响。轻触画面或按返回键结束休息。静态亮图不能代替真正黑屏休息。</p>
+      <p class="hint">最多 10 张图片，每张 ≤20 MB；或一个 ≤200 MB 且 ≤1 分钟的视频。建议选择与屏幕比例、方向一致的内容。替换成功后删除应用内旧副本，相册原文件不受影响。轻触画面或按返回键结束休息。静态亮图不能代替真正黑屏休息。</p>
     </section>
     <div class="switch">
       <span>隐藏数字<small>只显示涨跌趋势，不显示具体粉丝数</small></span>
@@ -774,7 +788,7 @@ body:not(.demo-mode) .demo-only, body.demo-mode .real-only { display:none!import
       </ol>
       <button class="btn" id="btn-guide" style="width:100%;margin-top:12px">重新查看首次使用引导</button>
     </div>
-    <div class="author"><b>B站粉丝屏 · 1.4.0</b><br>作者：weeazn<br><a id="author-home" href="https://space.bilibili.com/67368617" rel="noopener noreferrer">访问作者 B站主页 ↗</a><br><span style="color:var(--dim)">非 B站官方应用。仅查询公开数据，无需账号密码。</span></div>
+    <div class="author"><b>B站粉丝屏 · 1.4.2</b><br>作者：weeazn<br><a id="author-home" href="https://space.bilibili.com/67368617" rel="noopener noreferrer">访问作者 B站主页 ↗</a><br><span style="color:var(--dim)">非 B站官方应用。仅查询公开数据，无需账号密码。</span></div>
   </div>
 </div>
 
@@ -1612,7 +1626,24 @@ function syncNativeOled() {
     Math.min(3600, Math.max(10, Number(CFG.pixelShiftSec) || 45)), paused);
 }
 
+let oledLayoutPhase = 0, oledLayoutElapsed = 0;
+let oledLayoutLast = performance.now();
+function updateOledLayout(now = performance.now()) {
+  const elapsed = Math.min(2000, Math.max(0, now - oledLayoutLast)); oledLayoutLast = now;
+  if (!CFG.oled) { oledLayoutPhase = 0; oledLayoutElapsed = 0; delete document.body.dataset.oledLayout; return; }
+  if (document.hidden || $("sheet").classList.contains("open") || $("local-editor") || $("welcome")) return;
+  oledLayoutElapsed += elapsed;
+  if (oledLayoutElapsed >= 60000) {
+    oledLayoutElapsed = 0; oledLayoutPhase = (oledLayoutPhase + 1) % 4;
+    document.body.dataset.oledLayout = String(oledLayoutPhase);
+    const main = document.querySelector(".main"); if (main) main.scrollTop = 0;
+    if (CFG.animations && stageEl().animate) stageEl().animate([{opacity:.2},{opacity:1}],{duration:450});
+    window.dispatchEvent(new Event("resize"));
+  }
+}
+setInterval(updateOledLayout, 1000);
 function applyPixelShift(force) {
+  updateOledLayout();
   const st = stageEl();
   if (!st) return;
   if (nativeOledAvailable()) {
@@ -2169,12 +2200,15 @@ function refreshMediaRest(fillFields = false) {
   try { mediaRestState = JSON.parse(window.BiliScreen.mediaStatus()); } catch (_) { return; }
   $("media-rest-settings").classList.remove("hidden");
   const info = mediaRestState;
+  $("f-media-mode").value = info.mode || "sequence";
+  $("f-media-mode").disabled = info.kind === "video";
+  $("btn-media-gallery").disabled = info.kind !== "image" || !info.hasMedia || !!info.importing;
   $("t-media-rest").classList.toggle("on", !!info.enabled);
   $("t-media-rest").setAttribute("role", "switch");
   $("t-media-rest").setAttribute("aria-checked", String(!!info.enabled));
   if (fillFields) { $("f-media-interval").value = info.interval || 600; $("f-media-image-seconds").value = info.imageSeconds || 30; }
   $("media-rest-status").textContent = info.importing ? "正在复制并检查素材，请稍候…" : info.hasMedia
-    ? (info.kind === "video" ? "视频 · " + Math.round(info.duration / 1000) + " 秒" : "图片") + " · " + (Number(info.bytes) / 1048576).toFixed(1) + " MB" + (info.enabled ? (CFG.oled ? " · 已启用" : " · 等待开启 OLED 防烧屏") : " · 未启用")
+    ? (info.kind === "video" ? "视频 · " + Math.round(info.duration / 1000) + " 秒" : "图片 · " + (info.count || 1) + " 张（首张大小）") + " · " + (Number(info.bytes) / 1048576).toFixed(1) + " MB" + (info.enabled ? (CFG.oled ? " · 已启用" : " · 等待开启 OLED 防烧屏") : " · 未启用")
     : "尚未选择媒体；选好后开启上方开关。";
   $("btn-media-pick").disabled = !!info.importing;
   $("btn-media-preview").disabled = !info.hasMedia || !!info.importing;
@@ -2196,6 +2230,8 @@ function syncMediaAnimation() {
 if (mediaRestAvailable()) {
   refreshMediaRest(true); syncMediaAnimation();
   $("t-media-rest").onclick = () => saveMediaRest(!mediaRestState.enabled);
+  $("f-media-mode").onchange = () => window.BiliScreen.mediaMode($("f-media-mode").value);
+  $("btn-media-gallery").onclick = () => window.BiliScreen.mediaGallery();
   $("btn-media-save").onclick = () => saveMediaRest();
   $("btn-media-pick").onclick = () => window.BiliScreen.mediaPick();
   $("btn-media-preview").onclick = () => window.BiliScreen.mediaPreview();
@@ -2205,7 +2241,7 @@ if (mediaRestAvailable()) {
 
 // Only observe panel visibility, not chart/digit updates: no per-frame bridge traffic.
 if (nativeOledAvailable()) {
-  $("oled-hint").textContent = "安卓原生降亮度与微位移；打开设置或切到后台时暂停。纯黑不需要特殊权限，防护不能完全避免烧屏。";
+  $("oled-hint").textContent = "每 60 秒大幅轮换布局：数字与图表交换区域，顶栏上下轮换；配合原生微位移和降亮度。设置及后台暂停，关闭后恢复原布局。防护不能保证避免烧屏。";
   const oledObserver = new MutationObserver(syncNativeOled);
   oledObserver.observe($("sheet"), {attributes:true, attributeFilter:["class"]});
   oledObserver.observe(document.body, {childList:true});
